@@ -65,7 +65,16 @@ win32 {
     QMAKE_CXXFLAGS += -g
     QMAKE_LFLAGS_RELEASE =
     # required for backtrace
-    LIBS += -L$$(OMDEV)/tools/mingw/bin -limagehlp -lbfd -LF:/msys/mingw64/lib/binutils -lintl -liberty
+    # win32 vs. win64
+    UNAME = $$system(uname)
+    isEmpty(UNAME): UNAME = MINGW32
+    ISMINGW32 = $$find(UNAME, MINGW32)
+    message(uname: $$UNAME)
+    count( ISMINGW32, 1 ) {
+	  LIBS += -L$$(OMDEV)/tools/msys/mingw32/bin -L$$(OMDEV)/tools/msys/mingw32/lib -limagehlp -lbfd -lintl -liberty
+    } else {
+      LIBS += -L$$(OMDEV)/tools/msys/mingw64/bin -L$$(OMDEV)/tools/msys/mingw64/lib -limagehlp -lbfd -lintl -liberty
+	}
   }
   LIBS += -L../OMEditGUI/Debugger/Parser -lGDBMIParser \
     -L$$(OMBUILDDIR)/lib/omc -lomantlr3 -lOMPlot -lomqwt \
