@@ -61,7 +61,7 @@ void TLMEditor::contentsHasChanged(int position, int charsRemoved, int charsAdde
     }
     /* if user is changing the text. */
     if (!mForceSetPlainText) {
-      mpModelWidget->setModelModified();
+      //mpModelWidget->setModelModified();
       mTextChanged = true;
     }
   }
@@ -142,6 +142,22 @@ QDomNodeList TLMEditor::getSubModels()
 QDomNodeList TLMEditor::getConnections()
 {
   return mXmlDocument.elementsByTagName("Connection");
+}
+
+/*!
+ * \brief TLMEditor::getSimulationToolStartCommand
+ * Returns the simulation tool start command.
+ * \return
+ */
+QString TLMEditor::getSimulationToolStartCommand(QString name)
+{
+  QDomNodeList subModelList = mXmlDocument.elementsByTagName("SubModel");
+  for (int i = 0 ; i < subModelList.size() ; i++) {
+    QDomElement subModel = subModelList.at(i).toElement();
+    if (subModel.attribute("Name").compare(name) == 0) {
+      return subModel.attribute("StartCommand");
+     }
+   }
 }
 
 /*!
@@ -233,6 +249,47 @@ void TLMEditor::updateSubModelPlacementAnnotation(QString name, QString visible,
       break;
     }
   }
+}
+
+/*!
+ * \brief TLMEditor::updateSubModelParameters
+ * Updates the SubModel parameters.
+ * \param name
+ * \param startCommand
+ * \param ExactStepflag
+ */
+void TLMEditor::updateSubModelParameters(QString name, QString startCommand, QString exactStepFlag)
+{
+  QDomNodeList subModelList = mXmlDocument.elementsByTagName("SubModel");
+  for (int i = 0 ; i < subModelList.size() ; i++) {
+    QDomElement subModel = subModelList.at(i).toElement();
+    if (subModel.attribute("Name").compare(name) == 0) {
+      subModel.setAttribute("StartCommand", startCommand);
+      subModel.setAttribute("ExactStep", exactStepFlag);
+      mpPlainTextEdit->setPlainText(mXmlDocument.toString());
+      return;
+     }
+   }
+}
+
+/*!
+  Checks whether the exact step flag is set to 1 or not.
+  \param subModelName - the name for the submodel to check.
+  \return true on success.
+  */
+bool TLMEditor::isExactStepFlagSet(QString subModelName)
+{
+  QDomNodeList subModelList = mXmlDocument.elementsByTagName("SubModel");
+  for (int i = 0 ; i < subModelList.size() ; i++) {
+    QDomElement subModel = subModelList.at(i).toElement();
+    if (subModel.attribute("Name").compare(subModelName) == 0) {
+        if (subModel.attribute("ExactStep").compare("1") == 0 ) {
+           return true;
+        }
+      }
+      break;
+    }
+  return false;
 }
 
 /*!

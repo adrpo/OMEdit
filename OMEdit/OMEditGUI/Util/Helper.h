@@ -99,8 +99,8 @@ public:
   static QString utf8;
   static QFontInfo systemFontInfo;
   static QFontInfo monospacedFontInfo;
-  static QString defaultComponentAnnotationString;
-  static QString errorComponentAnnotationString;
+  static QString toolsOptionsPath;
+  static QString toolsOptionsPathMAC;
   /* Meta Modelica Types */
   static QString MODELICA_METATYPE;
   static QString MODELICA_STRING;
@@ -122,7 +122,6 @@ public:
   /* Global translated variables */
   static QString newModelicaClass;
   static QString createNewModelicaClass;
-  static QString findClasses;
   static QString openModelicaFiles;
   static QString openConvertModelicaFiles;
   static QString libraries;
@@ -141,6 +140,11 @@ public:
   static QString add;
   static QString edit;
   static QString save;
+  static QString saveTip;
+  static QString saveAs;
+  static QString saveAsTip;
+  static QString saveTotal;
+  static QString saveTotalTip;
   static QString apply;
   static QString chooseDirectory;
   static QString general;
@@ -186,7 +190,7 @@ public:
   static QString duplicateTip;
   static QString unloadClass;
   static QString unloadClassTip;
-  static QString unloadXMLTip;
+  static QString unloadTLMOrTextTip;
   static QString refresh;
   static QString simulate;
   static QString simulateTip;
@@ -250,12 +254,12 @@ public:
   static QString diagramView;
   static QString textView;
   static QString documentationView;
-  static QString searchModelicaClass;
+  static QString searchClasses;
   static QString findReplaceModelicaText;
   static QString left;
   static QString center;
   static QString right;
-  static QString connectArray;
+  static QString createConnection;
   static QString findVariables;
   static QString viewClass;
   static QString viewClassTip;
@@ -350,10 +354,6 @@ public:
     DELETE_TEXT_FILE_MSG,
     WRONG_MODIFIER,
     SET_INFO_XML_FLAG,
-    GENERATE_OPERATIONS_MSG,
-    GENERATE_OPERATIONS_MSG_MAC,
-    SET_INFO_XML_FLAG_MSG,
-    SET_INFO_XML_FLAG_MSG_MAC,
     DEBUG_CONFIGURATION_EXISTS_MSG,
     DEBUG_CONFIGURATION_SIZE_EXCEED,
     DELETE_DEBUG_CONFIGURATION_MSG,
@@ -362,10 +362,9 @@ public:
     BREAKPOINT_INSERT_NOT_SAVED,
     BREAKPOINT_INSERT_NOT_MODELICA_CLASS,
     TLMMANAGER_NOT_SET,
-    TLMMANAGER_NOT_SET_MSG,
-    TLMMANAGER_NOT_SET_MSG_MAC,
     METAMODEL_UNSAVED,
-    TLMCOSIMULATION_ALREADY_RUNNING
+    TLMCOSIMULATION_ALREADY_RUNNING,
+    TERMINAL_COMMAND_NOT_SET
   };
 
   static QString getMessage(int type);

@@ -38,7 +38,24 @@
 
 #include "Transformation.h"
 
+Transformation::Transformation()
+{
+  mValid = false;
+  initialize(StringHandler::Diagram);
+}
+
 Transformation::Transformation(StringHandler::ViewType viewType)
+{
+  mValid = true;
+  initialize(viewType);
+}
+
+Transformation::Transformation(const Transformation &transformation)
+{
+  updateTransformation(transformation);
+}
+
+void Transformation::initialize(StringHandler::ViewType viewType)
 {
   mViewType = viewType;
   mWidth = 200.0;
@@ -47,15 +64,15 @@ Transformation::Transformation(StringHandler::ViewType viewType)
   mOriginDiagram = QPointF(0.0, 0.0);
   mHasOriginDiagramX = true;
   mHasOriginDiagramY = true;
-  mExtent1Diagram = QPointF(0.0, 0.0);
-  mExtent2Diagram = QPointF(0.0, 0.0);
+  mExtent1Diagram = QPointF(-100.0, -100.0);
+  mExtent2Diagram = QPointF(100.0, 100.0);
   mRotateAngleDiagram = 0.0;
   mPositionDiagram = QPointF(0.0, 0.0);
   mOriginIcon = QPointF(0.0, 0.0);
   mHasOriginIconX = true;
   mHasOriginIconY = true;
-  mExtent1Icon = QPointF(0.0, 0.0);
-  mExtent2Icon = QPointF(0.0, 0.0);
+  mExtent1Icon = QPointF(-100.0, -100.0);
+  mExtent2Icon = QPointF(100.0, 100.0);
   mRotateAngleIcon = 0.0;
   mPositionIcon = QPointF(0.0, 0.0);
 }
@@ -142,6 +159,29 @@ void Transformation::parseTransformationString(QString value, qreal width, qreal
   }
 }
 
+void Transformation::updateTransformation(const Transformation &transformation)
+{
+  mValid = transformation.isValid();
+  mViewType = transformation.getViewType();
+  mWidth = transformation.getWidth();
+  mHeight = transformation.getHeight();
+  mVisible = transformation.getVisible();
+  mOriginDiagram = transformation.getOriginDiagram();
+  mHasOriginDiagramX = transformation.hasOriginDiagramX();
+  mHasOriginDiagramY = transformation.hasOriginDiagramY();
+  mExtent1Diagram = transformation.getExtent1Diagram();
+  mExtent2Diagram = transformation.getExtent2Diagram();
+  mRotateAngleDiagram = transformation.getRotateAngleDiagram();
+  mPositionDiagram = transformation.getPositionDiagram();
+  mOriginIcon = transformation.getOriginIcon();
+  mHasOriginIconX = transformation.hasOriginIconX();
+  mHasOriginIconY = transformation.hasOriginIconY();
+  mExtent1Icon = transformation.getExtent1Icon();
+  mExtent2Icon = transformation.getExtent2Icon();
+  mRotateAngleIcon = transformation.getRotateAngleIcon();
+  mPositionIcon = transformation.getPositionIcon();
+}
+
 QTransform Transformation::getTransformationMatrix()
 {
   switch (mViewType) {
@@ -152,11 +192,6 @@ QTransform Transformation::getTransformationMatrix()
     default:
       return getTransformationMatrixDiagram();
   }
-}
-
-bool Transformation::getVisible()
-{
-  return mVisible;
 }
 
 void Transformation::adjustPosition(qreal x, qreal y)
@@ -237,7 +272,7 @@ void Transformation::setExtent1(QPointF extent)
   }
 }
 
-QPointF Transformation::getExtent1()
+QPointF Transformation::getExtent1() const
 {
   switch (mViewType) {
     case StringHandler::Icon:
@@ -263,7 +298,7 @@ void Transformation::setExtent2(QPointF extent)
   }
 }
 
-QPointF Transformation::getExtent2()
+QPointF Transformation::getExtent2() const
 {
   switch (mViewType) {
     case StringHandler::Icon:

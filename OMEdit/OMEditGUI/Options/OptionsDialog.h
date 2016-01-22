@@ -165,6 +165,10 @@ public:
   QSpinBox* getToolbarIconSizeSpinBox() {return mpToolbarIconSizeSpinBox;}
   void setPreserveUserCustomizations(bool value);
   bool getPreserveUserCustomizations();
+  void setTerminalCommand(QString value) {mpTerminalCommandTextBox->setText(value);}
+  QString getTerminalCommand() {return mpTerminalCommandTextBox->text();}
+  void setTerminalCommandArguments(QString value) {mpTerminalCommandArgumentsTextBox->setText(value);}
+  QString getTerminalCommandArguments() {return mpTerminalCommandArgumentsTextBox->text();}
   QSpinBox* getLibraryIconSizeSpinBox() {return mpLibraryIconSizeSpinBox;}
   void setShowProtectedClasses(bool value);
   bool getShowProtectedClasses();
@@ -190,6 +194,11 @@ private:
   Label *mpToolbarIconSizeLabel;
   QSpinBox *mpToolbarIconSizeSpinBox;
   QCheckBox *mpPreserveUserCustomizations;
+  Label *mpTerminalCommandLabel;
+  QLineEdit *mpTerminalCommandTextBox;
+  QPushButton *mpTerminalCommandBrowseButton;
+  Label *mpTerminalCommandArgumentsLabel;
+  QLineEdit *mpTerminalCommandArgumentsTextBox;
   QGroupBox *mpLibrariesBrowserGroupBox;
   Label *mpLibraryIconSizeLabel;
   QSpinBox *mpLibraryIconSizeSpinBox;
@@ -214,6 +223,7 @@ private:
   QCheckBox *mpShowLatestNewsCheckBox;
 public slots:
   void selectWorkingDirectory();
+  void selectTerminalCommand();
   void autoSaveIntervalValueChanged(int value);
 };
 
@@ -298,6 +308,7 @@ public:
   QSpinBox *getTabSizeSpinBox() {return mpTabSizeSpinBox;}
   QSpinBox *getIndentSpinBox() {return mpIndentSpinBox;}
   QCheckBox* getSyntaxHighlightingCheckbox() {return mpSyntaxHighlightingCheckbox;}
+  QCheckBox* getMatchParenthesesCommentsQuotesCheckBox() {return mpMatchParenthesesCommentsQuotesCheckBox;}
   QCheckBox* getLineWrappingCheckbox() {return mpLineWrappingCheckbox;}
   QFontComboBox* getFontFamilyComboBox() {return mpFontFamilyComboBox;}
   DoubleSpinBox* getFontSizeSpinBox() {return mpFontSizeSpinBox;}
@@ -327,6 +338,7 @@ private:
   QSpinBox *mpIndentSpinBox;
   QGroupBox *mpSyntaxHighlightAndTextWrappingGroupBox;
   QCheckBox *mpSyntaxHighlightingCheckbox;
+  QCheckBox *mpMatchParenthesesCommentsQuotesCheckBox;
   QCheckBox *mpLineWrappingCheckbox;
   QGroupBox *mpFontColorsGroupBox;
   Label *mpFontFamilyLabel;
@@ -445,9 +457,11 @@ class SimulationPage : public QWidget
   Q_OBJECT
 public:
   SimulationPage(OptionsDialog *pOptionsDialog);
-  QComboBox* getMatchingAlgorithmComboBox();
-  QComboBox* getIndexReductionMethodComboBox();
-  QLineEdit* getOMCFlagsTextBox();
+  QComboBox* getMatchingAlgorithmComboBox() {return mpMatchingAlgorithmComboBox;}
+  QComboBox* getIndexReductionMethodComboBox() {return mpIndexReductionMethodComboBox;}
+  QComboBox* getTargetLanguageComboBox() {return mpTargetLanguageComboBox;}
+  QComboBox* getTargetCompilerComboBox() {return mpTargetCompilerComboBox;}
+  QLineEdit* getOMCFlagsTextBox() {return mpOMCFlagsTextBox;}
   QCheckBox *getSaveClassBeforeSimulationCheckBox() {return mpSaveClassBeforeSimulationCheckBox;}
   void setOutputMode(QString value);
   QString getOutputMode();
@@ -458,6 +472,10 @@ private:
   QComboBox *mpMatchingAlgorithmComboBox;
   Label *mpIndexReductionMethodLabel;
   QComboBox *mpIndexReductionMethodComboBox;
+  Label *mpTargetLanguageLabel;
+  QComboBox *mpTargetLanguageComboBox;
+  Label *mpCompilerLabel;
+  QComboBox *mpTargetCompilerComboBox;
   Label *mpOMCFlagsLabel;
   QLineEdit *mpOMCFlagsTextBox;
   QCheckBox *mpSaveClassBeforeSimulationCheckBox;
@@ -689,14 +707,19 @@ public:
   FMIPage(OptionsDialog *pOptionsDialog);
   void setFMIExportVersion(double version);
   double getFMIExportVersion();
+  void setFMIExportType(QString type);
+  QString getFMIExportType();
   QLineEdit* getFMUNameTextBox() {return mpFMUNameTextBox;}
 private:
   OptionsDialog *mpOptionsDialog;
   QGroupBox *mpExportGroupBox;
-  Label *mpVersionLabel;
   QGroupBox *mpVersionGroupBox;
   QRadioButton *mpVersion1RadioButton;
   QRadioButton *mpVersion2RadioButton;
+  QGroupBox *mpTypeGroupBox;
+  QRadioButton *mpModelExchangeRadioButton;
+  QRadioButton *mpCoSimulationRadioButton;
+  QRadioButton *mpModelExchangeCoSimulationRadioButton;
   Label *mpFMUNameLabel;
   QLineEdit *mpFMUNameTextBox;
 };

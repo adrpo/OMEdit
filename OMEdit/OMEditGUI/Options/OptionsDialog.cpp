@@ -119,6 +119,14 @@ void OptionsDialog::readGeneralSettings()
   if (mpSettings->contains("userCustomizations")) {
     mpGeneralSettingsPage->setPreserveUserCustomizations(mpSettings->value("userCustomizations").toBool());
   }
+  // read the terminal command
+  if (mpSettings->contains("terminalCommand")) {
+    mpGeneralSettingsPage->setTerminalCommand(mpSettings->value("terminalCommand").toString());
+  }
+  // read the terminal command arguments
+  if (mpSettings->contains("terminalCommandArgs")) {
+    mpGeneralSettingsPage->setTerminalCommandArguments(mpSettings->value("terminalCommandArgs").toString());
+  }
   // read library icon size
   if (mpSettings->contains("libraryIconSize")) {
     mpGeneralSettingsPage->getLibraryIconSizeSpinBox()->setValue(mpSettings->value("libraryIconSize").toInt());
@@ -218,6 +226,9 @@ void OptionsDialog::readModelicaTextSettings()
   if (mpSettings->contains("textEditor/enableSyntaxHighlighting")) {
     mpModelicaTextEditorPage->getSyntaxHighlightingCheckbox()->setChecked(mpSettings->value("textEditor/enableSyntaxHighlighting").toBool());
   }
+  if (mpSettings->contains("textEditor/matchParenthesesCommentsQuotes")) {
+    mpModelicaTextEditorPage->getMatchParenthesesCommentsQuotesCheckBox()->setChecked(mpSettings->value("textEditor/matchParenthesesCommentsQuotes").toBool());
+  }
   if (mpSettings->contains("textEditor/enableLineWrapping")) {
     mpModelicaTextEditorPage->getLineWrappingCheckbox()->setChecked(mpSettings->value("textEditor/enableLineWrapping").toBool());
   }
@@ -303,6 +314,18 @@ void OptionsDialog::readSimulationSettings()
     int currentIndex = mpSimulationPage->getIndexReductionMethodComboBox()->findText(mpSettings->value("simulation/indexReductionMethod").toString(), Qt::MatchExactly);
     if (currentIndex > -1) {
       mpSimulationPage->getIndexReductionMethodComboBox()->setCurrentIndex(currentIndex);
+    }
+  }
+  if (mpSettings->contains("simulation/targetLanguage")) {
+    int currentIndex = mpSimulationPage->getTargetLanguageComboBox()->findText(mpSettings->value("simulation/targetLanguage").toString(), Qt::MatchExactly);
+    if (currentIndex > -1) {
+      mpSimulationPage->getTargetLanguageComboBox()->setCurrentIndex(currentIndex);
+    }
+  }
+  if (mpSettings->contains("simulation/targetCompiler")) {
+    int currentIndex = mpSimulationPage->getTargetCompilerComboBox()->findText(mpSettings->value("simulation/targetCompiler").toString(), Qt::MatchExactly);
+    if (currentIndex > -1) {
+      mpSimulationPage->getTargetCompilerComboBox()->setCurrentIndex(currentIndex);
     }
   }
   if (mpSettings->contains("simulation/OMCFlags")) {
@@ -504,6 +527,9 @@ void OptionsDialog::readFMISettings()
   if (mpSettings->contains("FMIExport/Version")) {
     mpFMIPage->setFMIExportVersion(mpSettings->value("FMIExport/Version").toDouble());
   }
+  if (mpSettings->contains("FMIExport/Type")) {
+    mpFMIPage->setFMIExportType(mpSettings->value("FMIExport/Type").toString());
+  }
   if (mpSettings->contains("FMI/FMUName")) {
     mpFMIPage->getFMUNameTextBox()->setText(mpSettings->value("FMI/FMUName").toString());
   }
@@ -586,12 +612,16 @@ void OptionsDialog::saveGeneralSettings()
   mpSettings->setValue("toolbarIconSize", mpGeneralSettingsPage->getToolbarIconSizeSpinBox()->value());
   // save user customizations
   mpSettings->setValue("userCustomizations", mpGeneralSettingsPage->getPreserveUserCustomizations());
+  // save terminal command
+  mpSettings->setValue("terminalCommand", mpGeneralSettingsPage->getTerminalCommand());
+  // save terminal command arguments
+  mpSettings->setValue("terminalCommandArgs", mpGeneralSettingsPage->getTerminalCommandArguments());
   // save library icon size
   mpSettings->setValue("libraryIconSize", mpGeneralSettingsPage->getLibraryIconSizeSpinBox()->value());
   // save show protected classes
   mpSettings->setValue("showProtectedClasses", mpGeneralSettingsPage->getShowProtectedClasses());
   // show/hide the protected classes
-  getMainWindow()->getLibraryTreeWidget()->showProtectedClasses(mpGeneralSettingsPage->getShowProtectedClasses());
+  getMainWindow()->getLibraryWidget()->getLibraryTreeModel()->showHideProtectedClasses();
   // save modeling view mode
   mpSettings->setValue("modeling/viewmode", mpGeneralSettingsPage->getModelingViewMode());
   if (mpGeneralSettingsPage->getModelingViewMode().compare(Helper::subWindow) == 0) {
@@ -674,6 +704,7 @@ void OptionsDialog::saveModelicaTextSettings()
   mpSettings->setValue("textEditor/tabSize", mpModelicaTextEditorPage->getTabSizeSpinBox()->value());
   mpSettings->setValue("textEditor/indentSize", mpModelicaTextEditorPage->getIndentSpinBox()->value());
   mpSettings->setValue("textEditor/enableSyntaxHighlighting", mpModelicaTextEditorPage->getSyntaxHighlightingCheckbox()->isChecked());
+  mpSettings->setValue("textEditor/matchParenthesesCommentsQuotes", mpModelicaTextEditorPage->getMatchParenthesesCommentsQuotesCheckBox()->isChecked());
   mpSettings->setValue("textEditor/enableLineWrapping", mpModelicaTextEditorPage->getLineWrappingCheckbox()->isChecked());
   mpSettings->setValue("textEditor/fontFamily", mpModelicaTextEditorPage->getFontFamilyComboBox()->currentFont().family());
   mpSettings->setValue("textEditor/fontSize", mpModelicaTextEditorPage->getFontSizeSpinBox()->value());
@@ -710,15 +741,27 @@ void OptionsDialog::saveGraphicalViewsSettings()
 //! Saves the Simulation section settings to omedit.ini
 void OptionsDialog::saveSimulationSettings()
 {
+  // save matching algorithm
   mpSettings->setValue("simulation/matchingAlgorithm", mpSimulationPage->getMatchingAlgorithmComboBox()->currentText());
   mpMainWindow->getOMCProxy()->setMatchingAlgorithm(mpSimulationPage->getMatchingAlgorithmComboBox()->currentText());
+  // save index reduction
   mpSettings->setValue("simulation/indexReductionMethod", mpSimulationPage->getIndexReductionMethodComboBox()->currentText());
   mpMainWindow->getOMCProxy()->setIndexReductionMethod(mpSimulationPage->getIndexReductionMethodComboBox()->currentText());
+  // clear command line options before saving new ones
   mpMainWindow->getOMCProxy()->clearCommandLineOptions();
-  if (mpMainWindow->getOMCProxy()->setCommandLineOptions(mpSimulationPage->getOMCFlagsTextBox()->text()))
+  // save +simCodeTarget
+  mpSettings->setValue("simulation/targetLanguage", mpSimulationPage->getTargetLanguageComboBox()->currentText());
+  mpMainWindow->getOMCProxy()->setCommandLineOptions(QString("+simCodeTarget=%1").arg(mpSimulationPage->getTargetLanguageComboBox()->currentText()));
+  // save +target
+  mpSettings->setValue("simulation/targetCompiler", mpSimulationPage->getTargetCompilerComboBox()->currentText());
+  mpMainWindow->getOMCProxy()->setCommandLineOptions(QString("+target=%1").arg(mpSimulationPage->getTargetCompilerComboBox()->currentText()));
+  // save command line options ste manually by user. This will override above options.
+  if (mpMainWindow->getOMCProxy()->setCommandLineOptions(mpSimulationPage->getOMCFlagsTextBox()->text())) {
     mpSettings->setValue("simulation/OMCFlags", mpSimulationPage->getOMCFlagsTextBox()->text());
-  else
+  } else {
     mpSimulationPage->getOMCFlagsTextBox()->setText(mpSettings->value("simulation/OMCFlags").toString());
+  }
+  // save class before simulation.
   mpSettings->setValue("simulation/saveClassBeforeSimulation", mpSimulationPage->getSaveClassBeforeSimulationCheckBox()->isChecked());
   mpSettings->setValue("simulation/outputMode", mpSimulationPage->getOutputMode());
 }
@@ -831,6 +874,7 @@ void OptionsDialog::saveDebuggerSettings()
 void OptionsDialog::saveFMISettings()
 {
   mpSettings->setValue("FMIExport/Version", mpFMIPage->getFMIExportVersion());
+  mpSettings->setValue("FMIExport/Type", mpFMIPage->getFMIExportType());
   mpSettings->setValue("FMI/FMUName", mpFMIPage->getFMUNameTextBox()->text());
 }
 
@@ -901,6 +945,7 @@ void OptionsDialog::setUpDialog()
   QHBoxLayout *horizontalLayout = new QHBoxLayout;
   horizontalLayout->addWidget(mpOptionsList);
   QScrollArea *pPagesWidgetScrollArea = new QScrollArea;
+  pPagesWidgetScrollArea->setWidgetResizable(true);
   pPagesWidgetScrollArea->setWidget(mpPagesWidget);
   horizontalLayout->addWidget(pPagesWidgetScrollArea);
   // Create a layout
@@ -1131,6 +1176,22 @@ GeneralSettingsPage::GeneralSettingsPage(OptionsDialog *pOptionsDialog)
   mpToolbarIconSizeSpinBox->setValue(24);
   // Store Customizations Option
   mpPreserveUserCustomizations = new QCheckBox(tr("Preserve User's GUI Customizations"));
+  // terminal command
+  mpTerminalCommandLabel = new Label(tr("Terminal Command:"));
+  mpTerminalCommandTextBox = new QLineEdit;
+#ifdef Q_OS_WIN32
+  mpTerminalCommandTextBox->setText("cmd.exe");
+#elif defined(Q_OS_MAC)
+  mpTerminalCommandTextBox->setText("");
+#else
+  mpTerminalCommandTextBox->setText("");
+#endif
+  mpTerminalCommandBrowseButton = new QPushButton(Helper::browse);
+  mpTerminalCommandBrowseButton->setAutoDefault(false);
+  connect(mpTerminalCommandBrowseButton, SIGNAL(clicked()), SLOT(selectTerminalCommand()));
+  // terminal command args
+  mpTerminalCommandArgumentsLabel = new Label(tr("Terminal Command Arguments:"));
+  mpTerminalCommandArgumentsTextBox = new QLineEdit;
   // set the layout of general settings group
   QGridLayout *generalSettingsLayout = new QGridLayout;
   generalSettingsLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
@@ -1142,6 +1203,11 @@ GeneralSettingsPage::GeneralSettingsPage(OptionsDialog *pOptionsDialog)
   generalSettingsLayout->addWidget(mpToolbarIconSizeLabel, 2, 0);
   generalSettingsLayout->addWidget(mpToolbarIconSizeSpinBox, 2, 1, 1, 2);
   generalSettingsLayout->addWidget(mpPreserveUserCustomizations, 3, 0, 1, 3);
+  generalSettingsLayout->addWidget(mpTerminalCommandLabel, 4, 0);
+  generalSettingsLayout->addWidget(mpTerminalCommandTextBox, 4, 1);
+  generalSettingsLayout->addWidget(mpTerminalCommandBrowseButton, 4, 2);
+  generalSettingsLayout->addWidget(mpTerminalCommandArgumentsLabel, 5, 0);
+  generalSettingsLayout->addWidget(mpTerminalCommandArgumentsTextBox, 5, 1, 1, 2);
   mpGeneralSettingsGroupBox->setLayout(generalSettingsLayout);
   // Libraries Browser group box
   mpLibrariesBrowserGroupBox = new QGroupBox(tr("Libraries Browser"));
@@ -1392,13 +1458,31 @@ QCheckBox* GeneralSettingsPage::getShowLatestNewsCheckBox()
   return mpShowLatestNewsCheckBox;
 }
 
-//! Slot activated when mpWorkingDirectoryBrowseButton clicked signal is raised.
-//! Allows user to choose a new working directory.
+/*!
+ * \brief GeneralSettingsPage::selectWorkingDirectory
+ * Slot activated when mpWorkingDirectoryBrowseButton clicked signal is raised.
+ * Allows user to choose a new working directory.
+ */
 void GeneralSettingsPage::selectWorkingDirectory()
 {
   mpWorkingDirectoryTextBox->setText(StringHandler::getExistingDirectory(this, QString(Helper::applicationName).append(" - ").append(Helper::chooseDirectory), NULL));
 }
 
+/*!
+ * \brief GeneralSettingsPage::selectTerminalCommand
+ * Slot activated when mpTerminalCommandBrowseButton clicked signal is raised.
+ * Allows user to select a new terminal command.
+ */
+void GeneralSettingsPage::selectTerminalCommand()
+{
+  mpTerminalCommandTextBox->setText(StringHandler::getOpenFileName(this, QString("%1 - %2").arg(Helper::applicationName).arg(Helper::chooseFile), NULL, NULL, NULL));
+}
+
+/*!
+ * \brief GeneralSettingsPage::autoSaveIntervalValueChanged
+ * Slot activated when mpAutoSaveIntervalSpinBox valueChanged signal is raised.
+ * \param value
+ */
 void GeneralSettingsPage::autoSaveIntervalValueChanged(int value)
 {
   mpAutoSaveSecondsLabel->setText(tr("(%1 minute(s))").arg((double)value/60));
@@ -1428,7 +1512,7 @@ LibrariesPage::LibrariesPage(OptionsDialog *pOptionsDialog)
   mpSystemLibrariesTree->setColumnCount(2);
   mpSystemLibrariesTree->setTextElideMode(Qt::ElideMiddle);
   QStringList systemLabels;
-  systemLabels << tr("Name") << tr("Version");
+  systemLabels << tr("Name") << Helper::version;
   mpSystemLibrariesTree->setHeaderLabels(systemLabels);
   connect(mpSystemLibrariesTree, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), SLOT(openEditSystemLibrary()));
   // system libraries buttons
@@ -1606,7 +1690,7 @@ AddSystemLibraryDialog::AddSystemLibraryDialog(LibrariesPage *pLibrariesPage)
     mpNameComboBox->addItem(key,key);
   }
 
-  mpValueLabel = new Label(Helper::version);
+  mpValueLabel = new Label(Helper::version + ":");
   mpVersionTextBox = new QLineEdit("default");
   mpOkButton = new QPushButton(Helper::ok);
   connect(mpOkButton, SIGNAL(clicked()), SLOT(addSystemLibrary()));
@@ -1850,6 +1934,8 @@ ModelicaTextEditorPage::ModelicaTextEditorPage(OptionsDialog *pOptionsDialog)
   // syntax highlighting checkbox
   mpSyntaxHighlightingCheckbox = new QCheckBox(tr("Enable Syntax Highlighting"));
   mpSyntaxHighlightingCheckbox->setChecked(true);
+  // syntax highlighting checkbox
+  mpMatchParenthesesCommentsQuotesCheckBox = new QCheckBox(tr("Match Parentheses within Comments and Quotes"));
   // line wrap checkbox
   mpLineWrappingCheckbox = new QCheckBox(tr("Enable Line Wrapping"));
   mpLineWrappingCheckbox->setChecked(true);
@@ -1857,7 +1943,8 @@ ModelicaTextEditorPage::ModelicaTextEditorPage(OptionsDialog *pOptionsDialog)
   // set Syntax Highlight & Text Wrapping groupbox layout
   QGridLayout *pSyntaxHighlightAndTextWrappingGroupBoxLayout = new QGridLayout;
   pSyntaxHighlightAndTextWrappingGroupBoxLayout->addWidget(mpSyntaxHighlightingCheckbox, 0, 0);
-  pSyntaxHighlightAndTextWrappingGroupBoxLayout->addWidget(mpLineWrappingCheckbox, 1, 0);
+  pSyntaxHighlightAndTextWrappingGroupBoxLayout->addWidget(mpMatchParenthesesCommentsQuotesCheckBox, 1, 0);
+  pSyntaxHighlightAndTextWrappingGroupBoxLayout->addWidget(mpLineWrappingCheckbox, 2, 0);
   mpSyntaxHighlightAndTextWrappingGroupBox->setLayout(pSyntaxHighlightAndTextWrappingGroupBoxLayout);
   // fonts & colors groupbox
   mpFontColorsGroupBox = new QGroupBox(Helper::fontAndColors);
@@ -1908,6 +1995,7 @@ ModelicaTextEditorPage::ModelicaTextEditorPage(OptionsDialog *pOptionsDialog)
   ModelicaTextHighlighter *pModelicaTextHighlighter = new ModelicaTextHighlighter(this, mpPreviewPlainTextBox);
   connect(this, SIGNAL(updatePreview()), pModelicaTextHighlighter, SLOT(settingsChanged()));
   connect(mpSyntaxHighlightingCheckbox, SIGNAL(toggled(bool)), pModelicaTextHighlighter, SLOT(settingsChanged()));
+  connect(mpMatchParenthesesCommentsQuotesCheckBox, SIGNAL(toggled(bool)), pModelicaTextHighlighter, SLOT(settingsChanged()));
   // set fonts & colors groupbox layout
   QGridLayout *pFontsColorsGroupBoxLayout = new QGridLayout;
   pFontsColorsGroupBoxLayout->addWidget(mpFontFamilyLabel, 0, 0);
@@ -2462,8 +2550,7 @@ SimulationPage::SimulationPage(OptionsDialog *pOptionsDialog)
   mpOptionsDialog->getMainWindow()->getOMCProxy()->getAvailableMatchingAlgorithms(&matchingAlgorithmChoices, &matchingAlgorithmComments);
   mpMatchingAlgorithmComboBox = new QComboBox;
   int i = 0;
-  foreach (QString matchingAlgorithmChoice, matchingAlgorithmChoices)
-  {
+  foreach (QString matchingAlgorithmChoice, matchingAlgorithmChoices) {
     mpMatchingAlgorithmComboBox->addItem(matchingAlgorithmChoice);
     mpMatchingAlgorithmComboBox->setItemData(i, matchingAlgorithmComments[i], Qt::ToolTipRole);
     i++;
@@ -2475,13 +2562,34 @@ SimulationPage::SimulationPage(OptionsDialog *pOptionsDialog)
   mpOptionsDialog->getMainWindow()->getOMCProxy()->getAvailableIndexReductionMethods(&indexReductionMethodChoices, &indexReductionMethodComments);
   mpIndexReductionMethodComboBox = new QComboBox;
   i = 0;
-  foreach (QString indexReductionChoice, indexReductionMethodChoices)
-  {
+  foreach (QString indexReductionChoice, indexReductionMethodChoices) {
     mpIndexReductionMethodComboBox->addItem(indexReductionChoice);
     mpIndexReductionMethodComboBox->setItemData(i, indexReductionMethodComments[i], Qt::ToolTipRole);
     i++;
   }
   mpIndexReductionMethodComboBox->setCurrentIndex(mpIndexReductionMethodComboBox->findText(mpOptionsDialog->getMainWindow()->getOMCProxy()->getIndexReductionMethod()));
+  // Target Language
+  mpTargetLanguageLabel = new Label(tr("Target Language:"));
+  OMCInterface::getConfigFlagValidOptions_res simCodeTarget = mpOptionsDialog->getMainWindow()->getOMCProxy()->getConfigFlagValidOptions("simCodeTarget");
+  mpTargetLanguageComboBox = new QComboBox;
+  mpTargetLanguageComboBox->addItems(simCodeTarget.validOptions);
+  mpTargetLanguageComboBox->setToolTip(simCodeTarget.mainDescription);
+  i = 0;
+  foreach (QString description, simCodeTarget.descriptions) {
+    mpTargetLanguageComboBox->setItemData(i, description, Qt::ToolTipRole);
+    i++;
+  }
+  // Compiler
+  mpCompilerLabel = new Label(tr("Target Compiler:"));
+  OMCInterface::getConfigFlagValidOptions_res target = mpOptionsDialog->getMainWindow()->getOMCProxy()->getConfigFlagValidOptions("target");
+  mpTargetCompilerComboBox = new QComboBox;
+  mpTargetCompilerComboBox->addItems(target.validOptions);
+  mpTargetCompilerComboBox->setToolTip(target.mainDescription);
+  i = 0;
+  foreach (QString description, target.descriptions) {
+    mpTargetCompilerComboBox->setItemData(i, description, Qt::ToolTipRole);
+    i++;
+  }
   // OMC Flags
   mpOMCFlagsLabel = new Label(tr("OMC Flags"));
   mpOMCFlagsLabel->setToolTip(tr("Space separated list of flags e.g. +d=initialization +cheapmatchingAlgorithm=3"));
@@ -2516,10 +2624,14 @@ SimulationPage::SimulationPage(OptionsDialog *pOptionsDialog)
   pSimulationLayout->addWidget(mpMatchingAlgorithmComboBox, 0, 1);
   pSimulationLayout->addWidget(mpIndexReductionMethodLabel, 1, 0);
   pSimulationLayout->addWidget(mpIndexReductionMethodComboBox, 1, 1);
-  pSimulationLayout->addWidget(mpOMCFlagsLabel, 2, 0);
-  pSimulationLayout->addWidget(mpOMCFlagsTextBox, 2, 1);
-  pSimulationLayout->addWidget(mpSaveClassBeforeSimulationCheckBox, 3, 0, 1, 2);
-  pSimulationLayout->addWidget(mpOutputGroupBox, 4, 0, 1, 2);
+  pSimulationLayout->addWidget(mpTargetLanguageLabel, 2, 0);
+  pSimulationLayout->addWidget(mpTargetLanguageComboBox, 2, 1);
+  pSimulationLayout->addWidget(mpCompilerLabel, 3, 0);
+  pSimulationLayout->addWidget(mpTargetCompilerComboBox, 3, 1);
+  pSimulationLayout->addWidget(mpOMCFlagsLabel, 4, 0);
+  pSimulationLayout->addWidget(mpOMCFlagsTextBox, 4, 1);
+  pSimulationLayout->addWidget(mpSaveClassBeforeSimulationCheckBox, 5, 0, 1, 2);
+  pSimulationLayout->addWidget(mpOutputGroupBox, 6, 0, 1, 2);
   mpSimulationGroupBox->setLayout(pSimulationLayout);
   // set the layout
   QVBoxLayout *pLayout = new QVBoxLayout;
@@ -2527,21 +2639,6 @@ SimulationPage::SimulationPage(OptionsDialog *pOptionsDialog)
   pLayout->setContentsMargins(0, 0, 0, 0);
   pLayout->addWidget(mpSimulationGroupBox);
   setLayout(pLayout);
-}
-
-QComboBox* SimulationPage::getMatchingAlgorithmComboBox()
-{
-  return mpMatchingAlgorithmComboBox;
-}
-
-QComboBox* SimulationPage::getIndexReductionMethodComboBox()
-{
-  return mpIndexReductionMethodComboBox;
-}
-
-QLineEdit* SimulationPage::getOMCFlagsTextBox()
-{
-  return mpOMCFlagsTextBox;
 }
 
 void SimulationPage::setOutputMode(QString value)
@@ -3327,27 +3424,42 @@ void DebuggerPage::browseGDBPath()
 }
 
 /*!
-  \class DebuggerPage
-  \brief Creates an interface for debugger settings.
-  */
+ * \class DebuggerPage
+ * \brief Creates an interface for debugger settings.
+ */
 /*!
-  \param pParent - pointer to OptionsDialog
-  */
+ * \brief FMIPage::FMIPage
+ * \param pParent - pointer to OptionsDialog
+ */
 FMIPage::FMIPage(OptionsDialog *pOptionsDialog)
   : QWidget(pOptionsDialog)
 {
   mpOptionsDialog = pOptionsDialog;
   mpExportGroupBox = new QGroupBox(tr("Export"));
   // FMI export version
-  mpVersionLabel = new Label(Helper::version);
+  mpVersionGroupBox = new QGroupBox(Helper::version);
   mpVersion1RadioButton = new QRadioButton("1.0");
   mpVersion2RadioButton = new QRadioButton("2.0");
   mpVersion2RadioButton->setChecked(true);
-  // set the version group box layout
-  QHBoxLayout *pVersionLayout = new QHBoxLayout;
+  // set the version groupbox layout
+  QVBoxLayout *pVersionLayout = new QVBoxLayout;
   pVersionLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
   pVersionLayout->addWidget(mpVersion1RadioButton);
   pVersionLayout->addWidget(mpVersion2RadioButton);
+  mpVersionGroupBox->setLayout(pVersionLayout);
+  // FMI export type
+  mpTypeGroupBox = new QGroupBox(Helper::type);
+  mpModelExchangeRadioButton = new QRadioButton(tr("Model Exchange"));
+  mpCoSimulationRadioButton = new QRadioButton(tr("Co-Simulation"));
+  mpModelExchangeCoSimulationRadioButton = new QRadioButton(tr("Model Exchange and Co-Simulation"));
+  mpModelExchangeCoSimulationRadioButton->setChecked(true);
+  // set the type groupbox layout
+  QVBoxLayout *pTypeLayout = new QVBoxLayout;
+  pTypeLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+  pTypeLayout->addWidget(mpModelExchangeRadioButton);
+  pTypeLayout->addWidget(mpCoSimulationRadioButton);
+  pTypeLayout->addWidget(mpModelExchangeCoSimulationRadioButton);
+  mpTypeGroupBox->setLayout(pTypeLayout);
   // FMU name prefix
   mpFMUNameLabel = new Label(tr("FMU Name:"));
   mpFMUNameTextBox = new QLineEdit;
@@ -3355,10 +3467,10 @@ FMIPage::FMIPage(OptionsDialog *pOptionsDialog)
   // set the export group box layout
   QGridLayout *pExportLayout = new QGridLayout;
   pExportLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-  pExportLayout->addWidget(mpVersionLabel, 0, 0);
-  pExportLayout->addLayout(pVersionLayout, 0, 1);
-  pExportLayout->addWidget(mpFMUNameLabel, 1, 0);
-  pExportLayout->addWidget(mpFMUNameTextBox, 1, 1);
+  pExportLayout->addWidget(mpVersionGroupBox, 0, 0, 1, 2);
+  pExportLayout->addWidget(mpTypeGroupBox, 1, 0, 1, 2);
+  pExportLayout->addWidget(mpFMUNameLabel, 2, 0);
+  pExportLayout->addWidget(mpFMUNameTextBox, 2, 1);
   mpExportGroupBox->setLayout(pExportLayout);
   // set the layout
   QVBoxLayout *pMainLayout = new QVBoxLayout;
@@ -3368,6 +3480,11 @@ FMIPage::FMIPage(OptionsDialog *pOptionsDialog)
   setLayout(pMainLayout);
 }
 
+/*!
+ * \brief FMIPage::setFMIExportVersion
+ * Sets the FMI export version
+ * \param version
+ */
 void FMIPage::setFMIExportVersion(double version)
 {
   if (version == 1.0) {
@@ -3377,12 +3494,49 @@ void FMIPage::setFMIExportVersion(double version)
   }
 }
 
+/*!
+ * \brief FMIPage::getFMIExportVersion
+ * Gets the FMI export version
+ * \return
+ */
 double FMIPage::getFMIExportVersion()
 {
   if (mpVersion1RadioButton->isChecked()) {
     return 1.0;
   } else {
     return 2.0;
+  }
+}
+
+/*!
+ * \brief FMIPage::setFMIExportType
+ * Sets the FMI export type
+ * \param type
+ */
+void FMIPage::setFMIExportType(QString type)
+{
+  if (type.compare("me") == 0) {
+    mpModelExchangeRadioButton->setChecked(true);
+  } else if (type.compare("cs") == 0) {
+    mpCoSimulationRadioButton->setChecked(true);
+  } else {
+    mpModelExchangeCoSimulationRadioButton->setChecked(true);
+  }
+}
+
+/*!
+ * \brief FMIPage::getFMIExportType
+ * Gets the FMI export type
+ * \return
+ */
+QString FMIPage::getFMIExportType()
+{
+  if (mpModelExchangeRadioButton->isChecked()) {
+    return "me";
+  } else if (mpCoSimulationRadioButton->isChecked()) {
+    return "cs";
+  } else {
+    return "me_cs";
   }
 }
 

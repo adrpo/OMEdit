@@ -132,55 +132,50 @@ ModelicaTextEditor::ModelicaTextEditor(ModelWidget *pParent)
   setCanHaveBreakpoints(true);
   /* set the document marker */
   mpDocumentMarker = new DocumentMarker(mpPlainTextEdit->document());
-  setModelicaTextDocument(mpPlainTextEdit->document());
-  connect(this, SIGNAL(focusOut()), mpModelWidget, SLOT(modelicaEditorTextChanged()));
 }
 
-void ModelicaTextEditor::setLastValidText(QString validText)
-{
-  mLastValidText = validText;
-}
-
-//! Uses the OMC parseString API to check the class names inside the Modelica Text
-//! @return QStringList a list of class names
+/*!
+ * \brief ModelicaTextEditor::getClassNames
+ * Uses the OMC parseString API to check the class names inside the Modelica Text
+ * \param errorString
+ * \return QStringList a list of class names
+ * \sa ModelWidget::modelicaEditorTextChanged()
+ */
 QStringList ModelicaTextEditor::getClassNames(QString *errorString)
 {
   OMCProxy *pOMCProxy = mpMainWindow->getOMCProxy();
   QStringList classNames;
-  LibraryTreeNode *pLibraryTreeNode = mpModelWidget->getLibraryTreeNode();
+  LibraryTreeItem *pLibraryTreeItem = mpModelWidget->getLibraryTreeItem();
   if (mpPlainTextEdit->toPlainText().isEmpty()) {
     *errorString = tr("Start and End modifiers are different");
     return QStringList();
   } else {
-    if (pLibraryTreeNode->getParentName().isEmpty()) {
-      classNames = pOMCProxy->parseString(mpPlainTextEdit->toPlainText(), pLibraryTreeNode->getNameStructure());
-    } else {
-      classNames = pOMCProxy->parseString("within " + pLibraryTreeNode->getParentName() + ";" + mpPlainTextEdit->toPlainText(), pLibraryTreeNode->getNameStructure());
+    QString modelicaText = mpPlainTextEdit->toPlainText();
+    QString stringToParse = modelicaText;
+    if (!modelicaText.startsWith("within")) {
+      stringToParse = QString("within %1;%2").arg(pLibraryTreeItem->parent()->getNameStructure()).arg(modelicaText);
     }
+    classNames = pOMCProxy->parseString(stringToParse, pLibraryTreeItem->getNameStructure());
   }
   // if user is defining multiple top level classes.
   if (classNames.size() > 1) {
-    *errorString = QString(GUIMessages::getMessage(GUIMessages::MULTIPLE_TOP_LEVEL_CLASSES)).arg(pLibraryTreeNode->getNameStructure())
+    *errorString = QString(GUIMessages::getMessage(GUIMessages::MULTIPLE_TOP_LEVEL_CLASSES)).arg(pLibraryTreeItem->getNameStructure())
         .arg(classNames.join(","));
     return QStringList();
   }
   bool existModel = false;
   QStringList existingmodelsList;
   // check if the class already exists
-  foreach(QString className, classNames)
-  {
-    if (pLibraryTreeNode->getNameStructure().compare(className) != 0)
-    {
-      if (pOMCProxy->existClass(className))
-      {
+  foreach(QString className, classNames) {
+    if (pLibraryTreeItem->getNameStructure().compare(className) != 0) {
+      if (mpMainWindow->getLibraryWidget()->getLibraryTreeModel()->findLibraryTreeItem(className)) {
         existingmodelsList.append(className);
         existModel = true;
       }
     }
   }
   // check if existModel is true
-  if (existModel)
-  {
+  if (existModel) {
     *errorString = QString(GUIMessages::getMessage(GUIMessages::REDEFINING_EXISTING_CLASSES)).arg(existingmodelsList.join(",")).append("\n")
         .append(GUIMessages::getMessage(GUIMessages::DELETE_AND_LOAD).arg(""));
     return QStringList();
@@ -188,12 +183,16 @@ QStringList ModelicaTextEditor::getClassNames(QString *errorString)
   return classNames;
 }
 
-//! When user make some changes in the ModelicaEditor text then this method validates the text and show text correct options.
-bool ModelicaTextEditor::validateModelicaText()
+/*!
+ * \brief ModelicaTextEditor::validateText
+ * When user make some changes in the ModelicaTextEditor text then this method validates the text and show text correct options.
+ * \return
+ */
+bool ModelicaTextEditor::validateText()
 {
   if (mTextChanged) {
     // if the user makes few mistakes in the text then dont let him change the perspective
-    if (!emit focusOut()) {
+    if (!mpModelWidget->modelicaEditorTextChanged()) {
       QMessageBox *pMessageBox = new QMessageBox(mpMainWindow);
       pMessageBox->setWindowTitle(QString(Helper::applicationName).append(" - ").append(Helper::error));
       pMessageBox->setIcon(QMessageBox::Critical);
@@ -201,38 +200,26 @@ bool ModelicaTextEditor::validateModelicaText()
       pMessageBox->setText(GUIMessages::getMessage(GUIMessages::ERROR_IN_MODELICA_TEXT)
                            .append(GUIMessages::getMessage(GUIMessages::CHECK_MESSAGES_BROWSER))
                            .append(GUIMessages::getMessage(GUIMessages::REVERT_PREVIOUS_OR_FIX_ERRORS_MANUALLY)));
-      pMessageBox->addButton(tr("Revert from previous"), QMessageBox::AcceptRole);
-      pMessageBox->addButton(tr("Fix errors manually"), QMessageBox::RejectRole);
+      pMessageBox->addButton(tr("Fix error(s) manually"), QMessageBox::AcceptRole);
+      pMessageBox->addButton(tr("Revert to last correct version"), QMessageBox::RejectRole);
       int answer = pMessageBox->exec();
       switch (answer) {
-        case QMessageBox::AcceptRole:
+        case QMessageBox::RejectRole:
           mTextChanged = false;
-          // revert back to last valid block
+          // revert back to last correct version
           setPlainText(mLastValidText);
           return true;
-        case QMessageBox::RejectRole:
-          mTextChanged = true;
-          return false;
+        case QMessageBox::AcceptRole:
         default:
-          // should never be reached
           mTextChanged = true;
           return false;
       }
     } else {
       mTextChanged = false;
+      mLastValidText = mpPlainTextEdit->toPlainText();
     }
   }
   return true;
-}
-
-void ModelicaTextEditor::setModelicaTextDocument(QTextDocument *doc)
-{
-  ModelicaTextDocumentLayout *docLayout = qobject_cast<ModelicaTextDocumentLayout*>(doc->documentLayout());
-  if (!docLayout) {
-    docLayout = new ModelicaTextDocumentLayout(doc);
-    doc->setDocumentLayout(docLayout);
-  }
-  mpPlainTextEdit->setDocument(doc);
 }
 
 /*!
@@ -258,7 +245,7 @@ void ModelicaTextEditor::setPlainText(const QString &text)
     mForceSetPlainText = true;
     mpPlainTextEdit->setPlainText(text);
     mForceSetPlainText = false;
-    //updateLineNumberAreaWidth(0);
+    mLastValidText = text;
   }
 }
 
@@ -272,15 +259,17 @@ void ModelicaTextEditor::contentsHasChanged(int position, int charsRemoved, int 
       return;
     }
     /* if user is changing the system library class. */
-    if (mpModelWidget->getLibraryTreeNode()->isSystemLibrary() && !mForceSetPlainText) {
+    if (mpModelWidget->getLibraryTreeItem()->isSystemLibrary() && !mForceSetPlainText) {
       mpMainWindow->getInfoBar()->showMessage(tr("<b>Warning: </b>You are changing a system library class. System libraries are always read-only. Your changes will not be saved."));
-    } else if (mpModelWidget->getLibraryTreeNode()->isReadOnly() && !mForceSetPlainText) {
+    } else if (mpModelWidget->getLibraryTreeItem()->isReadOnly() && !mForceSetPlainText) {
       /* if user is changing the read-only class. */
       mpMainWindow->getInfoBar()->showMessage(tr("<b>Warning: </b>You are changing a read-only class."));
     } else {
-      /* if user is changing the normal class. */
+      /* if user is changing, the normal class. */
       if (!mForceSetPlainText) {
-        mpModelWidget->setModelModified();
+        mpModelWidget->setWindowTitle(QString(mpModelWidget->getLibraryTreeItem()->getNameStructure()).append("*"));
+        mpModelWidget->getLibraryTreeItem()->setIsSaved(false);
+        mpMainWindow->getLibraryWidget()->getLibraryTreeModel()->updateLibraryTreeItem(mpModelWidget->getLibraryTreeItem());
         mTextChanged = true;
       }
       /* Keep the line numbers and the block information for the line breakpoints updated */
@@ -607,17 +596,25 @@ void ModelicaTextHighlighter::initializeSettings()
   mHighlightingRules.append(rule);
 }
 
-//! Highlights the multilines text.
-//! Quoted text or multiline comments.
+/*!
+ * \brief ModelicaTextHighlighter::highlightMultiLine
+ * Highlights the multilines text.
+ * Quoted text or multiline comments.
+ * \param text
+ * \param text
+ */
 void ModelicaTextHighlighter::highlightMultiLine(const QString &text)
 {
   /* Hand-written recognizer beats the crap known as QRegEx ;) */
   int index = 0, startIndex = 0;
   int blockState = previousBlockState();
-  // fprintf(stderr, "%s with blockState %d\n", text.toStdString().c_str(), blockState);
-
-  while (index < text.length())
-  {
+  // store parentheses info
+  Parentheses parentheses;
+  TextBlockUserData *pTextBlockUserData = BaseEditorDocumentLayout::userData(currentBlock());
+  if (pTextBlockUserData) {
+    pTextBlockUserData->clearParentheses();
+  }
+  while (index < text.length()) {
     switch (blockState) {
       /* if the block already has single line comment then don't check for multi line comment and quotes. */
       case 1:
@@ -655,7 +652,20 @@ void ModelicaTextHighlighter::highlightMultiLine(const QString &text)
           blockState = 3;
         }
     }
+    // if no single line comment, no multi line comment and no quotes then store the parentheses
+    if (pTextBlockUserData && (blockState < 1 || blockState > 3 || mpModelicaTextEditorPage->getMatchParenthesesCommentsQuotesCheckBox()->isChecked())) {
+      if (text[index] == '(' || text[index] == '{' || text[index] == '[') {
+        parentheses.append(Parenthesis(Parenthesis::Opened, text[index], index));
+      } else if (text[index] == ')' || text[index] == '}' || text[index] == ']') {
+        parentheses.append(Parenthesis(Parenthesis::Closed, text[index], index));
+      }
+    }
     index++;
+  }
+  if (pTextBlockUserData) {
+    pTextBlockUserData->setParentheses(parentheses);
+    // set text block user data
+    setCurrentBlockUserData(pTextBlockUserData);
   }
   switch (blockState) {
     case 2:
@@ -676,6 +686,7 @@ void ModelicaTextHighlighter::highlightBlock(const QString &text)
   if (!mpModelicaTextEditorPage->getSyntaxHighlightingCheckbox()->isChecked()) {
     return;
   }
+  // set text block state
   setCurrentBlockState(0);
   setFormat(0, text.length(), mpModelicaTextEditorPage->getTextRuleColor());
   foreach (const HighlightingRule &rule, mHighlightingRules) {
