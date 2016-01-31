@@ -498,18 +498,21 @@ bool Component::hasShapeAnnotation(Component *pComponent)
       return iconAnnotationFound;
     }
   }
-  foreach (Component *pChildComponent, pComponent->getComponentsList()) {
-    iconAnnotationFound = hasShapeAnnotation(pChildComponent);
-    if (iconAnnotationFound) {
-      return iconAnnotationFound;
-    }
-    foreach (Component *pInheritedComponent, pChildComponent->getInheritedComponentsList()) {
-      iconAnnotationFound = hasShapeAnnotation(pInheritedComponent);
-      if (iconAnnotationFound) {
-        return iconAnnotationFound;
-      }
-    }
-  }
+  /* Ticket #3654
+   * Don't check components because if it has components and no shapes then it looks empty.
+   */
+//  foreach (Component *pChildComponent, pComponent->getComponentsList()) {
+//    iconAnnotationFound = hasShapeAnnotation(pChildComponent);
+//    if (iconAnnotationFound) {
+//      return iconAnnotationFound;
+//    }
+//    foreach (Component *pInheritedComponent, pChildComponent->getInheritedComponentsList()) {
+//      iconAnnotationFound = hasShapeAnnotation(pInheritedComponent);
+//      if (iconAnnotationFound) {
+//        return iconAnnotationFound;
+//      }
+//    }
+//  }
   return iconAnnotationFound;
 }
 
@@ -1666,8 +1669,20 @@ void Component::componentNameHasChanged()
   } else {
     setToolTip(tr("<b>%1</b> %2").arg(mpComponentInfo->getClassName()).arg(mpComponentInfo->getName()));
   }
-  emit displayTextChanged();
+  displayTextChangedRecursive();
   update();
+}
+
+/*!
+ * \brief Component::displayTextChangedRecursive
+ * Notifies all the TextAnnotation's about the name change.
+ */
+void Component::displayTextChangedRecursive()
+{
+  emit displayTextChanged();
+  foreach (Component *pInheritedComponent, mInheritedComponentsList) {
+    pInheritedComponent->displayTextChangedRecursive();
+  }
 }
 
 /*!

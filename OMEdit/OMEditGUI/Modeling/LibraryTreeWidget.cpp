@@ -1383,14 +1383,13 @@ void LibraryTreeModel::updateLibraryTreeItemClassText(LibraryTreeItem *pLibraryT
 void LibraryTreeModel::readLibraryTreeItemClassText(LibraryTreeItem *pLibraryTreeItem)
 {
   if (!pLibraryTreeItem->isFilePathValid()) {
-    // If class is top level then
-    if (pLibraryTreeItem->isTopLevel()) {
+    // If class is nested in a class and nested class is saved in the same file as parent.
+    if (pLibraryTreeItem->isInPackageOneFile()) {
+      updateLibraryTreeItemClassText(pLibraryTreeItem);
+    } else {
       if (pLibraryTreeItem->getLibraryType() == LibraryTreeItem::Modelica) {
         pLibraryTreeItem->setClassText(mpLibraryWidget->getMainWindow()->getOMCProxy()->listFile(pLibraryTreeItem->getNameStructure()));
       }
-    } else {
-      // If class is nested in a class
-      updateLibraryTreeItemClassText(pLibraryTreeItem);
     }
   } else {
     // If class is top level then simply read its file contents.
@@ -1586,7 +1585,7 @@ bool LibraryTreeModel::unloadClass(LibraryTreeItem *pLibraryTreeItem, bool askQu
     }
   }
   /* Delete the class in OMC.
-   * If deleteClass is successfull remove the class from Library Browser and delete the corresponding ModelWidget.
+   * If deleteClass is successful remove the class from Library Browser and delete the corresponding ModelWidget.
    */
   if (mpLibraryWidget->getMainWindow()->getOMCProxy()->deleteClass(pLibraryTreeItem->getNameStructure())) {
     /* QSortFilterProxy::filterAcceptRows changes the expand/collapse behavior of indexes or I am using it in some stupid way.
@@ -1687,7 +1686,7 @@ bool LibraryTreeModel::unloadTLMOrTextFile(LibraryTreeItem *pLibraryTreeItem, bo
 bool LibraryTreeModel::unloadLibraryTreeItem(LibraryTreeItem *pLibraryTreeItem)
 {
   /* Delete the class in OMC.
-   * If deleteClass is successfull remove the class from Library Browser.
+   * If deleteClass is successful remove the class from Library Browser.
    */
   if (mpLibraryWidget->getMainWindow()->getOMCProxy()->deleteClass(pLibraryTreeItem->getNameStructure())) {
     /* QSortFilterProxy::filterAcceptRows changes the expand/collapse behavior of indexes or I am using it in some stupid way.
@@ -2194,10 +2193,12 @@ void LibraryTreeView::createActions()
   connect(mpDuplicateClassAction, SIGNAL(triggered()), SLOT(duplicateClass()));
   // unload Action
   mpUnloadClassAction = new QAction(QIcon(":/Resources/icons/delete.svg"), Helper::unloadClass, this);
+  mpUnloadClassAction->setShortcut(QKeySequence::Delete);
   mpUnloadClassAction->setStatusTip(Helper::unloadClassTip);
   connect(mpUnloadClassAction, SIGNAL(triggered()), SLOT(unloadClass()));
   // unload TLM/Text file Action
   mpUnloadTLMFileAction = new QAction(QIcon(":/Resources/icons/delete.svg"), Helper::unloadClass, this);
+  mpUnloadTLMFileAction->setShortcut(QKeySequence::Delete);
   mpUnloadTLMFileAction->setStatusTip(Helper::unloadTLMOrTextTip);
   connect(mpUnloadTLMFileAction, SIGNAL(triggered()), SLOT(unloadTLMOrTextFile()));
   // Export FMU Action
@@ -2714,6 +2715,26 @@ void LibraryTreeView::startDrag(Qt::DropActions supportedActions)
 }
 
 /*!
+ * \brief LibraryTreeView::keyPressEvent
+ * Reimplementation of keypressevent.
+ * \param event
+ */
+void LibraryTreeView::keyPressEvent(QKeyEvent *event)
+{
+  if (event->key() == Qt::Key_Delete) {
+    LibraryTreeItem *pLibraryTreeItem = getSelectedLibraryTreeItem();
+    if (pLibraryTreeItem) {
+      if (pLibraryTreeItem->getLibraryType() == LibraryTreeItem::Modelica) {
+        unloadClass();
+      } else {
+        unloadTLMOrTextFile();
+      }
+    }
+  }
+  QTreeView::keyPressEvent(event);
+}
+
+/*!
  * \class LibraryWidget
  * \brief A widget for Libraries Browser.
  */
@@ -3104,7 +3125,7 @@ bool LibraryWidget::saveModelicaLibraryTreeItemHelper(LibraryTreeItem *pLibraryT
   } else {
     result = saveModelicaLibraryTreeItemFolder(pLibraryTreeItem);
     for (int i = 0; i < pLibraryTreeItem->getChildren().size(); i++) {
-      // if any child is saved in package.mo then only mark it saved and update its information becasue it should be already saved.
+      // if any child is saved in package.mo then only mark it saved and update its information because it should be already saved.
       LibraryTreeItem *pChildLibraryTreeItem = pLibraryTreeItem->child(i);
       if (pLibraryTreeItem->getFileName().compare(pChildLibraryTreeItem->getFileName()) == 0) {
         saveChildLibraryTreeItemsOneFileHelper(pChildLibraryTreeItem);
