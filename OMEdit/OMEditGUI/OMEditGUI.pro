@@ -71,9 +71,9 @@ win32 {
     ISMINGW32 = $$find(UNAME, MINGW32)
     message(uname: $$UNAME)
     count( ISMINGW32, 1 ) {
-	  LIBS += -L$$(OMDEV)/tools/msys/mingw32/bin -L$$(OMDEV)/tools/msys/mingw32/lib -limagehlp -lbfd -lintl -liberty
+	  LIBS += -L$$(OMDEV)/tools/msys/mingw32/bin -L$$(OMDEV)/tools/msys/mingw32/lib -L$$(OMDEV)/tools/msys/mingw32/lib/binutils -limagehlp -lbfd -lintl -liberty
     } else {
-      LIBS += -L$$(OMDEV)/tools/msys/mingw64/bin -L$$(OMDEV)/tools/msys/mingw64/lib -limagehlp -lbfd -lintl -liberty
+      LIBS += -L$$(OMDEV)/tools/msys/mingw64/bin -L$$(OMDEV)/tools/msys/mingw64/lib -L$$(OMDEV)/tools/msys/mingw64/lib/binutils -limagehlp -lbfd -lintl -liberty
 	}
   }
   LIBS += -L../OMEditGUI/Debugger/Parser -lGDBMIParser \
