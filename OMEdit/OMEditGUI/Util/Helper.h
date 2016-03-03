@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -261,8 +260,8 @@ public:
   static QString right;
   static QString createConnection;
   static QString findVariables;
-  static QString viewClass;
-  static QString viewClassTip;
+  static QString openClass;
+  static QString openClassTip;
   static QString viewDocumentation;
   static QString viewDocumentationTip;
   static QString dontShowThisMessageAgain;
@@ -305,6 +304,7 @@ public:
   static QString tlmCoSimulation;
   static QString running;
   static QString finished;
+  static QString newVariable;
 };
 
 class GUIMessages : public QObject

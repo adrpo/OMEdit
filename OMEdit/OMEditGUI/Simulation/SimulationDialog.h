@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -91,6 +90,10 @@ private:
   QLineEdit *mpStartTimeTextBox;
   Label *mpStopTimeLabel;
   QLineEdit *mpStopTimeTextBox;
+  QRadioButton *mpNumberofIntervalsRadioButton;
+  QSpinBox *mpNumberofIntervalsSpinBox;
+  QRadioButton *mpIntervalRadioButton;
+  QLineEdit *mpIntervalTextBox;
   QGroupBox *mpIntegrationGroupBox;
   Label *mpMethodLabel;
   QComboBox *mpMethodComboBox;
@@ -119,8 +122,6 @@ private:
   QCheckBox *mpLaunchAlgorithmicDebuggerCheckBox;
   // Output Tab
   QWidget *mpOutputTab;
-  Label *mpNumberofIntervalLabel;
-  QSpinBox *mpNumberofIntervalsSpinBox;
   Label *mpOutputFormatLabel;
   QComboBox *mpOutputFormatComboBox;
   Label *mpFileNameLabel;
@@ -210,6 +211,8 @@ public:
   void showAlgorithmicDebugger(SimulationOptions simulationOptions);
   void simulationProcessFinished(SimulationOptions simulationOptions, QDateTime resultFileLastModifiedDateTime);
 public slots:
+  void numberOfIntervalsRadioToggled(bool toggle);
+  void intervalRadioToggled(bool toggle);
   void updateMethodToolTip(int index);
   void enableDasslOptions(QString method);
   void showIntegrationHelp();

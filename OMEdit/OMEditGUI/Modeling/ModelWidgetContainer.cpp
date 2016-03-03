@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -92,7 +91,6 @@ GraphicsView::GraphicsView(StringHandler::ViewType viewType, ModelWidget *parent
   qreal vertical = (mViewType == StringHandler::Icon) ? pGraphicalViewsPage->getIconViewGridVertical() : pGraphicalViewsPage->getDiagramViewGridVertical();
   mCoOrdinateSystem.setGrid(QPointF(horizontal, vertical));
   setExtentRectangle(left, bottom, right, top);
-  centerOn(sceneRect().center());
   scale(1.0, -1.0);     // invert the drawing area.
   setIsCustomScale(false);
   setAddClassAnnotationNeeded(false);
@@ -112,8 +110,8 @@ GraphicsView::GraphicsView(StringHandler::ViewType viewType, ModelWidget *parent
 void GraphicsView::setExtentRectangle(qreal left, qreal bottom, qreal right, qreal top)
 {
   mExtentRectangle = QRectF(left, bottom, fabs(left - right), fabs(bottom - top));
-  QRectF sceneRectangle = mExtentRectangle.adjusted(left * 2, bottom * 2, right * 2, top * 2);
-  setSceneRect(sceneRectangle);
+  setSceneRect(mExtentRectangle);
+  centerOn(mExtentRectangle.center());
 }
 
 void GraphicsView::setIsCreatingConnection(bool enable)
@@ -362,6 +360,7 @@ void GraphicsView::addComponentToClass(Component *pComponent)
     if (pComponent->getLibraryTreeItem()) {
       className = StringHandler::makeClassNameRelative(pComponent->getLibraryTreeItem()->getNameStructure(),
                                                        mpModelWidget->getLibraryTreeItem()->getNameStructure());
+      pComponent->getComponentInfo()->setClassName(className);
     } else {
       className = pComponent->getComponentInfo()->getClassName();
     }
@@ -946,11 +945,13 @@ void GraphicsView::createActions()
   // Flip Horizontal Action
   mpFlipHorizontalAction = new QAction(QIcon(":/Resources/icons/flip-horizontal.svg"), tr("Flip Horizontal"), this);
   mpFlipHorizontalAction->setStatusTip(tr("Flips the item horizontally"));
+  mpFlipHorizontalAction->setShortcut(QKeySequence("h"));
   mpFlipHorizontalAction->setDisabled(isSystemLibrary);
   connect(mpFlipHorizontalAction, SIGNAL(triggered()), SLOT(flipHorizontal()));
   // Flip Vertical Action
   mpFlipVerticalAction = new QAction(QIcon(":/Resources/icons/flip-vertical.svg"), tr("Flip Vertical"), this);
   mpFlipVerticalAction->setStatusTip(tr("Flips the item vertically"));
+  mpFlipVerticalAction->setShortcut(QKeySequence("v"));
   mpFlipVerticalAction->setDisabled(isSystemLibrary);
   connect(mpFlipVerticalAction, SIGNAL(triggered()), SLOT(flipVertical()));
 }
@@ -1045,14 +1046,18 @@ void GraphicsView::addConnection(Component *pComponent)
       // check of any of starting or ending components are array
       bool showConnectionArrayDialog = false;
       if ((pStartComponent->getParentComponent() && pStartComponent->getRootParentComponent()->getComponentInfo()->isArray()) ||
+          (!pStartComponent->getParentComponent() && pStartComponent->getRootParentComponent()->getLibraryTreeItem() && pStartComponent->getRootParentComponent()->getLibraryTreeItem()->getRestriction() == StringHandler::ExpandableConnector) ||
+          (pStartComponent->getParentComponent() && pStartComponent->getLibraryTreeItem() && pStartComponent->getLibraryTreeItem()->getRestriction() == StringHandler::ExpandableConnector) ||
           (pStartComponent->getComponentInfo() && pStartComponent->getComponentInfo()->isArray()) ||
           (pComponent->getParentComponent() && pComponent->getRootParentComponent()->getComponentInfo()->isArray()) ||
+          (!pComponent->getParentComponent() && pComponent->getRootParentComponent()->getLibraryTreeItem() && pComponent->getRootParentComponent()->getLibraryTreeItem()->getRestriction() == StringHandler::ExpandableConnector) ||
+          (pComponent->getParentComponent() && pComponent->getLibraryTreeItem() && pComponent->getLibraryTreeItem()->getRestriction() == StringHandler::ExpandableConnector) ||
           (pComponent->getComponentInfo() && pComponent->getComponentInfo()->isArray())) {
         showConnectionArrayDialog = true;
       }
       if (showConnectionArrayDialog) {
-        ConnectionArray *pConnectionArray = new ConnectionArray(this, mpConnectionLineAnnotation,
-                                                                mpModelWidget->getModelWidgetContainer()->getMainWindow());
+        CreateConnectionDialog *pConnectionArray = new CreateConnectionDialog(this, mpConnectionLineAnnotation,
+                                                                              mpModelWidget->getModelWidgetContainer()->getMainWindow());
         // if user cancels the array connection
         if (!pConnectionArray->exec()) {
           removeCurrentConnection();
@@ -1165,8 +1170,9 @@ void GraphicsView::clearSelection()
  * \brief GraphicsView::addClassAnnotation
  * Adds the annotation string of Icon and Diagram layer to the model. Also creates the model icon in the tree.
  * If some custom models are cross referenced then update them accordingly.
+ * \param alwaysAdd - if false then skip the OMCProxy::addClassAnnotation() if annotation is empty.
  */
-void GraphicsView::addClassAnnotation()
+void GraphicsView::addClassAnnotation(bool alwaysAdd)
 {
   if (mpModelWidget->getLibraryTreeItem()->isSystemLibrary()) {
     return;
@@ -1217,6 +1223,12 @@ void GraphicsView::addClassAnnotation()
     annotationString = QString("annotate=%1(graphics={%2})").arg(viewType).arg(graphicsList.join(","));
   } else {
     annotationString = QString("annotate=%1()").arg(viewType);
+    /* Ticket #3731
+     * Return from here since we don't want empty Icon & Diagram annotations.
+     */
+    if (!alwaysAdd) {
+      return;
+    }
   }
   // add the class annotation to model through OMC
   if (pMainWindow->getOMCProxy()->addClassAnnotation(mpModelWidget->getLibraryTreeItem()->getNameStructure(), annotationString)) {
@@ -1340,7 +1352,8 @@ void GraphicsView::flipVertical()
 void GraphicsView::dragMoveEvent(QDragMoveEvent *event)
 {
   // check if the class is system library
-  if (mpModelWidget->getLibraryTreeItem()->isSystemLibrary()) {
+  if (mpModelWidget->getLibraryTreeItem()->isSystemLibrary() ||
+      mpModelWidget->getLibraryTreeItem()->getRestriction() == StringHandler::Package) {
     event->ignore();
     return;
   }
@@ -1794,6 +1807,14 @@ void GraphicsView::keyPressEvent(QKeyEvent *event)
     mpModelWidget->getUndoStack()->beginMacro("Rotate anti clockwise by key press");
     emit keyPressRotateAntiClockwise();
     mpModelWidget->getUndoStack()->endMacro();
+  } else if (!shiftModifier && !controlModifier && event->key() == Qt::Key_H && isAnyItemSelectedAndEditable(event->key())) {
+    mpModelWidget->getUndoStack()->beginMacro("Flip horizontal by key press");
+    emit keyPressFlipHorizontal();
+    mpModelWidget->getUndoStack()->endMacro();
+  } else if (!shiftModifier && !controlModifier && event->key() == Qt::Key_V && isAnyItemSelectedAndEditable(event->key())) {
+    mpModelWidget->getUndoStack()->beginMacro("Flip vertical by key press");
+    emit keyPressFlipVertical();
+    mpModelWidget->getUndoStack()->endMacro();
   } else if (event->key() == Qt::Key_Escape && isCreatingConnection()) {
     removeCurrentConnection();
   } else {
@@ -1855,6 +1876,12 @@ void GraphicsView::keyReleaseEvent(QKeyEvent *event)
     mpModelWidget->updateClassAnnotationIfNeeded();
     mpModelWidget->updateModelicaText();
   } else if (shiftModifier && controlModifier && event->key() == Qt::Key_R && isAnyItemSelectedAndEditable(event->key())) {
+    mpModelWidget->updateClassAnnotationIfNeeded();
+    mpModelWidget->updateModelicaText();
+  } else if (!shiftModifier && !controlModifier && event->key() == Qt::Key_H && isAnyItemSelectedAndEditable(event->key())) {
+    mpModelWidget->updateClassAnnotationIfNeeded();
+    mpModelWidget->updateModelicaText();
+  } else if (!shiftModifier && !controlModifier && event->key() == Qt::Key_V && isAnyItemSelectedAndEditable(event->key())) {
     mpModelWidget->updateClassAnnotationIfNeeded();
     mpModelWidget->updateModelicaText();
   } else {
@@ -2740,13 +2767,14 @@ void ModelWidget::reDrawModelWidget()
 /*!
  * \brief ModelWidget::validateText
  * Validates the text of the editor.
+ * \param pLibraryTreeItem
  * \return Returns true if validation is successful otherwise return false.
  */
-bool ModelWidget::validateText()
+bool ModelWidget::validateText(LibraryTreeItem **pLibraryTreeItem)
 {
   ModelicaTextEditor *pModelicaTextEditor = dynamic_cast<ModelicaTextEditor*>(mpEditor);
   if (pModelicaTextEditor) {
-    return pModelicaTextEditor->validateText();
+    return pModelicaTextEditor->validateText(pLibraryTreeItem);
   }
   TLMEditor *pTLMEditor = dynamic_cast<TLMEditor*>(mpEditor);
   if (pTLMEditor) {
@@ -2759,10 +2787,11 @@ bool ModelWidget::validateText()
  * \brief ModelWidget::modelicaEditorTextChanged
  * Called when Modelica text has been changed by user manually.\n
  * Updates the LibraryTreeItem and ModelWidget with new changes.
+ * \param pLibraryTreeItem
  * \return
  * \sa ModelicaTextEditor::getClassNames()
  */
-bool ModelWidget::modelicaEditorTextChanged()
+bool ModelWidget::modelicaEditorTextChanged(LibraryTreeItem **pLibraryTreeItem)
 {
   QString errorString;
   ModelicaTextEditor *pModelicaTextEditor = dynamic_cast<ModelicaTextEditor*>(mpEditor);
@@ -2778,13 +2807,21 @@ bool ModelWidget::modelicaEditorTextChanged()
   }
   /* if no errors are found with the Modelica Text then load it in OMC */
   QString className = classNames.at(0);
-  QString modelicaText = pModelicaTextEditor->getPlainTextEdit()->toPlainText();
-  QString stringToLoad = modelicaText;
-  if (!modelicaText.startsWith("within")) {
-    stringToLoad = QString("within %1;%2").arg(mpLibraryTreeItem->parent()->getNameStructure()).arg(modelicaText);
-  }
-  if (!pOMCProxy->loadString(stringToLoad, mpLibraryTreeItem->getFileName(), Helper::utf8, true)) {
-    return false;
+  QString modelicaText = pModelicaTextEditor->getPlainText();
+  QString stringToLoad;
+  LibraryTreeItem *pParentLibraryTreeItem = mpModelWidgetContainer->getMainWindow()->getLibraryWidget()->getLibraryTreeModel()->getContainingFileParentLibraryTreeItem(mpLibraryTreeItem);
+  if (pParentLibraryTreeItem != mpLibraryTreeItem) {
+    stringToLoad = mpLibraryTreeItem->getClassTextBefore() + modelicaText + mpLibraryTreeItem->getClassTextAfter();
+    // only use OMCProxy::loadString merge when LibraryTreeItem::SaveFolderStructure i.e., package.mo
+    if (!pOMCProxy->loadString(stringToLoad, pParentLibraryTreeItem->getFileName(), Helper::utf8, pParentLibraryTreeItem->getSaveContentsType() == LibraryTreeItem::SaveFolderStructure)) {
+      return false;
+    }
+  } else {
+    stringToLoad = modelicaText;
+    // only use OMCProxy::loadString merge when LibraryTreeItem::SaveFolderStructure i.e., package.mo
+    if (!pOMCProxy->loadString(stringToLoad, className, Helper::utf8, mpLibraryTreeItem->getSaveContentsType() == LibraryTreeItem::SaveFolderStructure)) {
+      return false;
+    }
   }
   /* if user has changed the class contents then refresh it. */
   if (className.compare(mpLibraryTreeItem->getNameStructure()) == 0) {
@@ -2792,7 +2829,7 @@ bool ModelWidget::modelicaEditorTextChanged()
     reDrawModelWidget();
     mpLibraryTreeItem->setClassText(modelicaText);
     if (mpLibraryTreeItem->isInPackageOneFile()) {
-      updateModelicaText();
+      updateModelicaTextManually(stringToLoad);
     }
     // update child classes
     updateChildClasses(mpLibraryTreeItem);
@@ -2801,26 +2838,32 @@ bool ModelWidget::modelicaEditorTextChanged()
      * Update the LibraryTreeItem with new class name and then refresh it.
      */
     int row = mpLibraryTreeItem->row();
-    pLibraryTreeModel->unloadLibraryTreeItem(mpLibraryTreeItem);
+    /* if a class inside a package one file is renamed then it is already deleted by calling loadString using the whole package contents
+     * so we tell unloadLibraryTreeItem to don't try deleteClass since it will only produce error
+     */
+    pLibraryTreeModel->unloadLibraryTreeItem(mpLibraryTreeItem, !mpLibraryTreeItem->isInPackageOneFile());
+    mpLibraryTreeItem->setModelWidget(0);
     QString name = StringHandler::getLastWordAfterDot(className);
-    LibraryTreeItem *pLibraryTreeItem = pLibraryTreeModel->createLibraryTreeItem(name, mpLibraryTreeItem->parent(), false, false, true, row);
+    LibraryTreeItem *pNewLibraryTreeItem = pLibraryTreeModel->createLibraryTreeItem(name, mpLibraryTreeItem->parent(), false, false, true, row);
+    pNewLibraryTreeItem->setSaveContentsType(mpLibraryTreeItem->getSaveContentsType());
     pLibraryTreeModel->checkIfAnyNonExistingClassLoaded();
     // make the new created LibraryTreeItem selected
-    QModelIndex modelIndex = pLibraryTreeModel->libraryTreeItemIndex(pLibraryTreeItem);
+    QModelIndex modelIndex = pLibraryTreeModel->libraryTreeItemIndex(pNewLibraryTreeItem);
     LibraryTreeProxyModel *pLibraryTreeProxyModel = mpModelWidgetContainer->getMainWindow()->getLibraryWidget()->getLibraryTreeProxyModel();
     QModelIndex proxyIndex = pLibraryTreeProxyModel->mapFromSource(modelIndex);
     LibraryTreeView *pLibraryTreeView = mpModelWidgetContainer->getMainWindow()->getLibraryWidget()->getLibraryTreeView();
     pLibraryTreeView->selectionModel()->clearSelection();
     pLibraryTreeView->selectionModel()->select(proxyIndex, QItemSelectionModel::Select);
     // update class text
-    pLibraryTreeItem->setClassText(modelicaText);
-    pLibraryTreeItem->setModelWidget(this);
-    setLibraryTreeItem(pLibraryTreeItem);
-    setModelFilePathLabel(pLibraryTreeItem->getFileName());
+    pNewLibraryTreeItem->setClassText(modelicaText);
+    pNewLibraryTreeItem->setModelWidget(this);
+    setLibraryTreeItem(pNewLibraryTreeItem);
+    setModelFilePathLabel(pNewLibraryTreeItem->getFileName());
     reDrawModelWidget();
-    if (pLibraryTreeItem->isInPackageOneFile()) {
-      updateModelicaText();
+    if (pNewLibraryTreeItem->isInPackageOneFile()) {
+      updateModelicaTextManually(stringToLoad);
     }
+    *pLibraryTreeItem = pNewLibraryTreeItem;
   }
   return true;
 }
@@ -2913,6 +2956,18 @@ void ModelWidget::updateModelicaText()
   setWindowTitle(QString(mpLibraryTreeItem->getNameStructure()).append("*"));
   LibraryTreeModel *pLibraryTreeModel = mpModelWidgetContainer->getMainWindow()->getLibraryWidget()->getLibraryTreeModel();
   pLibraryTreeModel->updateLibraryTreeItemClassText(mpLibraryTreeItem);
+}
+
+/*!
+ * \brief ModelWidget::updateModelicaTextManually
+ * Updates the Parent Modelica class text after user has made changes manually in the text view.
+ * \param contents
+ */
+void ModelWidget::updateModelicaTextManually(QString contents)
+{
+  setWindowTitle(QString(mpLibraryTreeItem->getNameStructure()).append("*"));
+  LibraryTreeModel *pLibraryTreeModel = mpModelWidgetContainer->getMainWindow()->getLibraryWidget()->getLibraryTreeModel();
+  pLibraryTreeModel->updateLibraryTreeItemClassTextManually(mpLibraryTreeItem, contents);
 }
 
 /*!
@@ -3328,7 +3383,7 @@ void ModelWidget::getModelConnections()
     // get start and end components
     QStringList startComponentList = connectionList.at(0).split(".");
     QStringList endComponentList = connectionList.at(1).split(".");
-    QString errorMessage = tr("Unable to find component %1 while parsing connection %2.").arg(connectionList.at(0)).arg(connectionString);
+    QString errorMessage = tr("Unable to find component %1 while parsing connection %2.");
     // get start component
     Component *pStartComponent = 0;
     if (startComponentList.size() > 0) {
@@ -3360,7 +3415,8 @@ void ModelWidget::getModelConnections()
     }
     // show error message if start component is not found.
     if (!pStartConnectorComponent) {
-      pMainWindow->getMessagesWidget()->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0, errorMessage,
+      pMainWindow->getMessagesWidget()->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0,
+                                                                  errorMessage.arg(connectionList.at(0)).arg(connectionString),
                                                                   Helper::scriptingKind, Helper::errorLevel));
       continue;
     }
@@ -3371,7 +3427,7 @@ void ModelWidget::getModelConnections()
       if (endComponentName.contains("[")) {
         endComponentName = endComponentName.mid(0, endComponentName.indexOf("["));
       }
-      pEndComponent = mpDiagramGraphicsView->getComponentObject(endComponentList.at(0));
+      pEndComponent = mpDiagramGraphicsView->getComponentObject(endComponentName);
     }
     // get the end connector
     if (pEndComponent) {
@@ -3392,7 +3448,8 @@ void ModelWidget::getModelConnections()
     }
     // show error message if end component is not found.
     if (!pEndConnectorComponent) {
-      pMainWindow->getMessagesWidget()->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0, errorMessage,
+      pMainWindow->getMessagesWidget()->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0,
+                                                                  errorMessage.arg(connectionList.at(1)).arg(connectionString),
                                                                   Helper::scriptingKind, Helper::errorLevel));
       continue;
     }
@@ -3512,7 +3569,7 @@ void ModelWidget::showIconView(bool checked)
 {
   // validate the modelica text before switching to icon view
   if (checked) {
-    if (!validateText()) {
+    if (!validateText(&mpLibraryTreeItem)) {
       mpTextViewToolButton->setChecked(true);
       return;
     }
@@ -3543,7 +3600,7 @@ void ModelWidget::showDiagramView(bool checked)
 {
   // validate the modelica text before switching to diagram view
   if (checked) {
-    if (!validateText()) {
+    if (!validateText(&mpLibraryTreeItem)) {
       mpTextViewToolButton->setChecked(true);
       return;
     }
@@ -3607,11 +3664,11 @@ void ModelWidget::makeFileWritAble()
 void ModelWidget::showDocumentationView()
 {
   // validate the modelica text before switching to documentation view
-  if (!validateText()) {
+  if (!validateText(&mpLibraryTreeItem)) {
     mpTextViewToolButton->setChecked(true);
     return;
   }
-  mpModelWidgetContainer->getMainWindow()->getDocumentationWidget()->showDocumentation(getLibraryTreeItem()->getNameStructure());
+  mpModelWidgetContainer->getMainWindow()->getDocumentationWidget()->showDocumentation(getLibraryTreeItem());
   mpModelWidgetContainer->getMainWindow()->getDocumentationDockWidget()->show();
 }
 
@@ -4000,7 +4057,7 @@ void ModelWidgetContainer::currentModelWidgetChanged(QMdiSubWindow *pSubWindow)
   }
   // update the actions of the menu and toolbars
   getMainWindow()->getSaveAction()->setEnabled(enabled);
-  //  getMainWindow()->getSaveAsAction()->setEnabled(enabled);
+  getMainWindow()->getSaveAsAction()->setEnabled(enabled);
   //  getMainWindow()->getSaveAllAction()->setEnabled(enabled);
   getMainWindow()->getSaveTotalAction()->setEnabled(enabled && modelica);
   getMainWindow()->getShowGridLinesAction()->setEnabled(enabled && !pModelWidget->getLibraryTreeItem()->isSystemLibrary());

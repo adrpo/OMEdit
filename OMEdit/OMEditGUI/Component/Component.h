@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -166,7 +165,7 @@ public:
   OriginItem* getOriginItem() {return mpOriginItem;}
   QAction* getParametersAction() {return mpParametersAction;}
   QAction* getAttributesAction() {return mpAttributesAction;}
-  QAction* getViewClassAction() {return mpViewClassAction;}
+  QAction* getOpenClassAction() {return mpOpenClassAction;}
   QAction* getViewDocumentationAction() {return mpViewDocumentationAction;}
   QAction* getTLMAttributesAction() {return mpTLMAttributesAction;}
   ComponentInfo* getComponentInfo() {return mpComponentInfo;}
@@ -199,6 +198,7 @@ public:
   void shapeAdded();
   void shapeUpdated();
   void shapeDeleted();
+  void renameComponentInConnections(QString newName);
   void addInterfacePoint(TLMInterfacePointInfo *pTLMInterfacePointInfo);
   void removeInterfacePoint(TLMInterfacePointInfo *pTLMInterfacePointInfo);
   void renameInterfacePoint(TLMInterfacePointInfo *pTLMInterfacePointInfo, QString interfacePoint);
@@ -222,7 +222,7 @@ private:
   TextAnnotation *mpDefaultComponentText;
   QAction *mpParametersAction;
   QAction *mpAttributesAction;
-  QAction *mpViewClassAction;
+  QAction *mpOpenClassAction;
   QAction *mpViewDocumentationAction;
   QAction *mpTLMAttributesAction;
   ResizerItem *mpBottomLeftResizerItem;
@@ -261,6 +261,7 @@ private:
   void updateConnections();
   QString getParameterDisplayStringFromExtendsModifiers(QString parameterName);
   QString getParameterDisplayStringFromExtendsParameters(QString parameterName);
+  void updateToolTip();
 signals:
   void added();
   void transformChange();
@@ -283,6 +284,7 @@ public slots:
   void resizeComponent(QPointF newPosition);
   void finishResizeComponent();
   void resizedComponent();
+  void componentCommentHasChanged();
   void componentNameHasChanged();
   void displayTextChangedRecursive();
   void deleteMe();
@@ -305,7 +307,7 @@ public slots:
   void moveCtrlRight();
   void showParameters();
   void showAttributes();
-  void viewClass();
+  void openClass();
   void viewDocumentation();
   void showTLMAttributes();
 protected:

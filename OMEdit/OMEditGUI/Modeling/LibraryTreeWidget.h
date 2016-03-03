@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -118,8 +117,12 @@ public:
   QPixmap getPixmap() {return mPixmap;}
   void setDragPixmap(QPixmap dragPixmap) {mDragPixmap = dragPixmap;}
   QPixmap getDragPixmap() {return mDragPixmap;}
+  void setClassTextBefore(QString classTextBefore) {mClassTextBefore = classTextBefore;}
+  QString getClassTextBefore() {return mClassTextBefore;}
   void setClassText(QString classText) {mClassText = classText;}
   QString getClassText(LibraryTreeModel *pLibraryTreeModel);
+  void setClassTextAfter(QString classTextAfter) {mClassTextAfter = classTextAfter;}
+  QString getClassTextAfter() {return mClassTextAfter;}
   void setExpanded(bool expanded) {mExpanded = expanded;}
   bool isExpanded() const {return mExpanded;}
   void setNonExisting(bool nonExisting) {mNonExisting = nonExisting;}
@@ -167,7 +170,9 @@ private:
   QIcon mIcon;
   QPixmap mPixmap;
   QPixmap mDragPixmap;
+  QString mClassTextBefore;
   QString mClassText;
+  QString mClassTextAfter;
   bool mExpanded;
   bool mNonExisting;
 signals:
@@ -233,6 +238,7 @@ public:
   void removeNonExistingLibraryTreeItem(LibraryTreeItem *pLibraryTreeItem) {mNonExistingLibraryTreeItemsList.removeOne(pLibraryTreeItem);}
   void updateLibraryTreeItem(LibraryTreeItem *pLibraryTreeItem);
   void updateLibraryTreeItemClassText(LibraryTreeItem *pLibraryTreeItem);
+  void updateLibraryTreeItemClassTextManually(LibraryTreeItem *pLibraryTreeItem, QString contents);
   void readLibraryTreeItemClassText(LibraryTreeItem *pLibraryTreeItem);
   LibraryTreeItem* getContainingFileParentLibraryTreeItem(LibraryTreeItem *pLibraryTreeItem);
   void loadLibraryTreeItemPixmap(LibraryTreeItem *pLibraryTreeItem);
@@ -242,10 +248,11 @@ public:
   void showHideProtectedClasses();
   bool unloadClass(LibraryTreeItem *pLibraryTreeItem, bool askQuestion = true);
   bool unloadTLMOrTextFile(LibraryTreeItem *pLibraryTreeItem, bool askQuestion = true);
-  bool unloadLibraryTreeItem(LibraryTreeItem *pLibraryTreeItem);
+  bool unloadLibraryTreeItem(LibraryTreeItem *pLibraryTreeItem, bool doDeleteClass);
   bool removeLibraryTreeItem(LibraryTreeItem *pLibraryTreeItem);
   void moveClassUpDown(LibraryTreeItem *pLibraryTreeItem, bool up);
   void moveClassTopBottom(LibraryTreeItem *pLibraryTreeItem, bool top);
+  void updateBindings(LibraryTreeItem *pLibraryTreeItem);
   QString getUniqueTopLevelItemName(QString name, int number = 1);
   void emitDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight) {emit dataChanged(topLeft, bottomRight);}
 private:
@@ -256,7 +263,7 @@ private:
                                          const QModelIndex &parentIndex) const;
   LibraryTreeItem* getLibraryTreeItemFromFileHelper(LibraryTreeItem *pLibraryTreeItem, QString fileName, int lineNumber);
   void updateChildLibraryTreeItemClassText(LibraryTreeItem *pLibraryTreeItem, QString contents, QString fileName);
-  QString readLibraryTreeItemClassTextFromText(LibraryTreeItem *pLibraryTreeItem, QString contents);
+  void readLibraryTreeItemClassTextFromText(LibraryTreeItem *pLibraryTreeItem, QString contents);
   QString readLibraryTreeItemClassTextFromFile(LibraryTreeItem *pLibraryTreeItem);
   void unloadClassHelper(LibraryTreeItem *pLibraryTreeItem, LibraryTreeItem *pParentLibraryTreeItem);
   void unloadClassChildren(LibraryTreeItem *pLibraryTreeItem);
@@ -272,7 +279,7 @@ public:
   LibraryWidget* getLibraryWidget() {return mpLibraryWidget;}
 private:
   LibraryWidget *mpLibraryWidget;
-  QAction *mpViewClassAction;
+  QAction *mpOpenClassAction;
   QAction *mpViewDocumentationAction;
   QAction *mpNewModelicaClassAction;
   QAction *mpSaveAction;
@@ -296,6 +303,7 @@ private:
   QAction *mpExportFMUAction;
   QAction *mpExportXMLAction;
   QAction *mpExportFigaroAction;
+  QAction *mpUpdateBindingsAction;
   QAction *mpFetchInterfaceDataAction;
   QAction *mpTLMCoSimulationAction;
   void createActions();
@@ -304,7 +312,7 @@ private:
 public slots:
   void libraryTreeItemExpanded(QModelIndex index);
   void showContextMenu(QPoint point);
-  void viewClass();
+  void openClass();
   void viewDocumentation();
   void createNewModelicaClass();
   void saveClass();
@@ -327,6 +335,7 @@ public slots:
   void exportModelFMU();
   void exportModelXML();
   void exportModelFigaro();
+  void updateBindings();
   void fetchInterfaceData();
   void TLMSimulate();
 protected:

@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -160,7 +159,8 @@ public:
   static QColor getSimulationMessageTypeColor(StringHandler::SimulationMessageType type);
   static QString makeClassNameRelative(QString draggedClassName, QString droppedClassName);
   static QString toCamelCase(QString str);
-  static int getTrailingSpacesSize(QString str);
+  static QMap<int, int> getLeadingSpaces(QString contents);
+  static int getLeadingSpacesSize(QString str);
   static bool isFileWritAble(QString filePath);
 protected:
   static QString mLastOpenDir;

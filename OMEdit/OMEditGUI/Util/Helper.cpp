@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -254,8 +253,8 @@ QString Helper::center;
 QString Helper::right;
 QString Helper::createConnection;
 QString Helper::findVariables;
-QString Helper::viewClass;
-QString Helper::viewClassTip;
+QString Helper::openClass;
+QString Helper::openClassTip;
 QString Helper::viewDocumentation;
 QString Helper::viewDocumentationTip;
 QString Helper::dontShowThisMessageAgain;
@@ -298,6 +297,7 @@ QString Helper::tlmCoSimulationSetupTip;
 QString Helper::tlmCoSimulation;
 QString Helper::running;
 QString Helper::finished;
+QString Helper::newVariable;
 
 void Helper::initHelperVariables()
 {
@@ -444,8 +444,8 @@ void Helper::initHelperVariables()
   Helper::right = tr("Right");
   Helper::createConnection = tr("Create Connection");
   Helper::findVariables = tr("Find Variables");
-  Helper::viewClass = tr("View Class");
-  Helper::viewClassTip = tr("Opens the class details");
+  Helper::openClass = tr("Open Class");
+  Helper::openClassTip = tr("Opens the class details");
   Helper::viewDocumentation = tr("View Documentation");
   Helper::viewDocumentationTip = tr("Opens the class documentation");
   Helper::dontShowThisMessageAgain = tr("Don't show this message again");
@@ -488,6 +488,7 @@ void Helper::initHelperVariables()
   Helper::tlmCoSimulation = tr("TLM Co-Simulation");
   Helper::running = tr("Running");
   Helper::finished = tr("Finished");
+  Helper::newVariable = tr("<New Variable>");
 }
 
 QString GUIMessages::getMessage(int type)

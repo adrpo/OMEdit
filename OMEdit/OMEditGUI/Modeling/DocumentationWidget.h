@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -44,8 +43,8 @@
 class DocumentationHistory
 {
 public:
-  QString mUrl;
-  DocumentationHistory(QString url) {mUrl = url;}
+  LibraryTreeItem *mpLibraryTreeItem;
+  DocumentationHistory(LibraryTreeItem *pLibraryTreeItem) {mpLibraryTreeItem = pLibraryTreeItem;}
 };
 
 class ModelWidget;
@@ -60,7 +59,7 @@ public:
   QToolButton* getPreviousToolButton();
   QToolButton* getNextToolButton();
   DocumentationViewer* getDocumentationViewer();
-  void showDocumentation(QString className);
+  void showDocumentation(LibraryTreeItem *pLibraryTreeItem);
 private:
   MainWindow *mpMainWindow;
   QFile mDocumentationFile;
@@ -79,9 +78,11 @@ class DocumentationViewer : public QWebView
   Q_OBJECT
 private:
   DocumentationWidget *mpDocumentationWidget;
-  qreal zoomFact;
+  qreal mZoomFactor;
 public:
   DocumentationViewer(DocumentationWidget *pParent);
+private:
+  void createActions();
 public slots:
   void processLinkClick(QUrl url);
   void requestFinished();

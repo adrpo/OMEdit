@@ -30,7 +30,7 @@
 
 QT += network core gui webkit xml xmlpatterns svg
 greaterThan(QT_MAJOR_VERSION, 4) {
-    QT *= printsupport widgets webkitwidgets
+  QT *= printsupport widgets webkitwidgets
 }
 
 TRANSLATIONS = Resources/nls/OMEdit_de.ts \
@@ -92,7 +92,7 @@ win32 {
   # options.  For systems using the GNU linker, it is necessary to use
   # the -rdynamic linker option.  Note that names of "static" functions
   # are not exposed, and won't be available in the backtrace.
-  CONFIG(release, debug|release){
+  CONFIG(release, debug|release) {
     QMAKE_LFLAGS_RELEASE += -rdynamic
   }
 }

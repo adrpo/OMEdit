@@ -376,6 +376,22 @@ void UpdateComponentAttributesCommand::redo()
     QString comment = StringHandler::escapeString(mNewComponentInfo.getComment());
     if (pOMCProxy->setComponentComment(modelName, mpComponent->getComponentInfo()->getName(), comment)) {
       mpComponent->getComponentInfo()->setComment(comment);
+      mpComponent->componentCommentHasChanged();
+      if (mpComponent->getLibraryTreeItem()->isConnector()) {
+        if (mpComponent->getGraphicsView()->getViewType() == StringHandler::Icon) {
+          Component *pComponent = 0;
+          pComponent = mpComponent->getGraphicsView()->getModelWidget()->getDiagramGraphicsView()->getComponentObject(mpComponent->getName());
+          if (pComponent) {
+            pComponent->componentCommentHasChanged();
+          }
+        } else {
+          Component *pComponent = 0;
+          pComponent = mpComponent->getGraphicsView()->getModelWidget()->getIconGraphicsView()->getComponentObject(mpComponent->getName());
+          if (pComponent) {
+            pComponent->componentCommentHasChanged();
+          }
+        }
+      }
     } else {
       QMessageBox::critical(pModelWidget->getModelWidgetContainer()->getMainWindow(),
                             QString(Helper::applicationName).append(" - ").append(Helper::error), pOMCProxy->getResult(), Helper::ok);
@@ -386,6 +402,7 @@ void UpdateComponentAttributesCommand::redo()
   if (mpComponent->getComponentInfo()->getName().compare(mNewComponentInfo.getName()) != 0) {
     // if renameComponentInClass command is successful update the component with new name
     if (pOMCProxy->renameComponentInClass(modelName, mpComponent->getComponentInfo()->getName(), mNewComponentInfo.getName())) {
+      mpComponent->renameComponentInConnections(mNewComponentInfo.getName());
       mpComponent->getComponentInfo()->setName(mNewComponentInfo.getName());
       mpComponent->componentNameHasChanged();
       if (mpComponent->getLibraryTreeItem()->isConnector()) {
@@ -502,6 +519,22 @@ void UpdateComponentAttributesCommand::undo()
     QString comment = StringHandler::escapeString(mOldComponentInfo.getComment());
     if (pOMCProxy->setComponentComment(modelName, mpComponent->getComponentInfo()->getName(), comment)) {
       mpComponent->getComponentInfo()->setComment(comment);
+      mpComponent->componentCommentHasChanged();
+      if (mpComponent->getLibraryTreeItem()->isConnector()) {
+        if (mpComponent->getGraphicsView()->getViewType() == StringHandler::Icon) {
+          Component *pComponent = 0;
+          pComponent = mpComponent->getGraphicsView()->getModelWidget()->getDiagramGraphicsView()->getComponentObject(mpComponent->getName());
+          if (pComponent) {
+            pComponent->componentCommentHasChanged();
+          }
+        } else {
+          Component *pComponent = 0;
+          pComponent = mpComponent->getGraphicsView()->getModelWidget()->getIconGraphicsView()->getComponentObject(mpComponent->getName());
+          if (pComponent) {
+            pComponent->componentCommentHasChanged();
+          }
+        }
+      }
     } else {
       QMessageBox::critical(pModelWidget->getModelWidgetContainer()->getMainWindow(),
                             QString(Helper::applicationName).append(" - ").append(Helper::error), pOMCProxy->getResult(), Helper::ok);
@@ -512,6 +545,7 @@ void UpdateComponentAttributesCommand::undo()
   if (mpComponent->getComponentInfo()->getName().compare(mOldComponentInfo.getName()) != 0) {
     // if renameComponentInClass command is successful update the component with new name
     if (pOMCProxy->renameComponentInClass(modelName, mpComponent->getComponentInfo()->getName(), mOldComponentInfo.getName())) {
+      mpComponent->renameComponentInConnections(mOldComponentInfo.getName());
       mpComponent->getComponentInfo()->setName(mOldComponentInfo.getName());
       mpComponent->componentNameHasChanged();
       if (mpComponent->getLibraryTreeItem()->isConnector()) {
@@ -731,10 +765,18 @@ void AddConnectionCommand::redo()
 {
   // Add the start component connection details.
   Component *pStartComponent = mpConnectionLineAnnotation->getStartComponent();
-  pStartComponent->getRootParentComponent()->addConnectionDetails(mpConnectionLineAnnotation);
+  if (pStartComponent->getRootParentComponent()) {
+    pStartComponent->getRootParentComponent()->addConnectionDetails(mpConnectionLineAnnotation);
+  } else {
+    pStartComponent->addConnectionDetails(mpConnectionLineAnnotation);
+  }
   // Add the end component connection details.
   Component *pEndComponent = mpConnectionLineAnnotation->getEndComponent();
-  pEndComponent->getRootParentComponent()->addConnectionDetails(mpConnectionLineAnnotation);
+  if (pEndComponent->getRootParentComponent()) {
+    pEndComponent->getRootParentComponent()->addConnectionDetails(mpConnectionLineAnnotation);
+  } else {
+    pEndComponent->addConnectionDetails(mpConnectionLineAnnotation);
+  }
   mpConnectionLineAnnotation->getGraphicsView()->addConnectionToList(mpConnectionLineAnnotation);
   mpConnectionLineAnnotation->getGraphicsView()->addItem(mpConnectionLineAnnotation);
   mpConnectionLineAnnotation->emitAdded();
@@ -751,10 +793,18 @@ void AddConnectionCommand::undo()
 {
   // Remove the start component connection details.
   Component *pStartComponent = mpConnectionLineAnnotation->getStartComponent();
-  pStartComponent->getRootParentComponent()->removeConnectionDetails(mpConnectionLineAnnotation);
+  if (pStartComponent->getRootParentComponent()) {
+    pStartComponent->getRootParentComponent()->removeConnectionDetails(mpConnectionLineAnnotation);
+  } else {
+    pStartComponent->removeConnectionDetails(mpConnectionLineAnnotation);
+  }
   // Remove the end component connection details.
   Component *pEndComponent = mpConnectionLineAnnotation->getEndComponent();
-  pEndComponent->getRootParentComponent()->removeConnectionDetails(mpConnectionLineAnnotation);
+  if (pEndComponent->getRootParentComponent()) {
+    pEndComponent->getRootParentComponent()->removeConnectionDetails(mpConnectionLineAnnotation);
+  } else {
+    pEndComponent->removeConnectionDetails(mpConnectionLineAnnotation);
+  }
   mpConnectionLineAnnotation->getGraphicsView()->deleteConnectionFromList(mpConnectionLineAnnotation);
   mpConnectionLineAnnotation->getGraphicsView()->removeItem(mpConnectionLineAnnotation);
   mpConnectionLineAnnotation->emitDeleted();
@@ -827,8 +877,8 @@ void DeleteConnectionCommand::redo()
   }
   // Remove the end component connection details.
   Component *pEndComponent = mpConnectionLineAnnotation->getEndComponent();
-  if (pEndComponent->getParentComponent()) {
-    pEndComponent->getParentComponent()->removeConnectionDetails(mpConnectionLineAnnotation);
+  if (pEndComponent->getRootParentComponent()) {
+    pEndComponent->getRootParentComponent()->removeConnectionDetails(mpConnectionLineAnnotation);
   } else {
     pEndComponent->removeConnectionDetails(mpConnectionLineAnnotation);
   }
@@ -853,8 +903,8 @@ void DeleteConnectionCommand::undo()
   }
   // Add the end component connection details.
   Component *pEndComponent = mpConnectionLineAnnotation->getEndComponent();
-  if (pEndComponent->getParentComponent()) {
-    pEndComponent->getParentComponent()->addConnectionDetails(mpConnectionLineAnnotation);
+  if (pEndComponent->getRootParentComponent()) {
+    pEndComponent->getRootParentComponent()->addConnectionDetails(mpConnectionLineAnnotation);
   } else {
     pEndComponent->addConnectionDetails(mpConnectionLineAnnotation);
   }

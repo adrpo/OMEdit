@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -151,8 +150,9 @@ class DuplicateClassDialog : public QDialog
 {
   Q_OBJECT
 public:
-  DuplicateClassDialog(LibraryTreeItem *pLibraryTreeItem, MainWindow *pMainWindow);
+  DuplicateClassDialog(bool saveAs, LibraryTreeItem *pLibraryTreeItem, MainWindow *pMainWindow);
 private:
+  bool mSaveAs;
   LibraryTreeItem *mpLibraryTreeItem;
   MainWindow *mpMainWindow;
   Label *mpNameLabel;

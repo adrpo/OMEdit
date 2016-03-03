@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -135,6 +134,19 @@ void SimulationDialog::setUpForm()
   mpStartTimeTextBox = new QLineEdit("0");
   mpStopTimeLabel = new Label(tr("Stop Time:"));
   mpStopTimeTextBox = new QLineEdit("1");
+  // Output Interval
+  mpNumberofIntervalsRadioButton = new QRadioButton(tr("Number of Intervals:"));
+  mpNumberofIntervalsRadioButton->setChecked(true);
+  connect(mpNumberofIntervalsRadioButton, SIGNAL(toggled(bool)), SLOT(numberOfIntervalsRadioToggled(bool)));
+  mpNumberofIntervalsSpinBox = new QSpinBox;
+  mpNumberofIntervalsSpinBox->setRange(0, std::numeric_limits<int>::max());
+  mpNumberofIntervalsSpinBox->setSingleStep(100);
+  mpNumberofIntervalsSpinBox->setValue(500);
+  // Interval
+  mpIntervalRadioButton = new QRadioButton(tr("Interval:"));
+  connect(mpIntervalRadioButton, SIGNAL(toggled(bool)), SLOT(intervalRadioToggled(bool)));
+  mpIntervalTextBox = new QLineEdit("0.002");
+  mpIntervalTextBox->setEnabled(false);
   // set the layout for simulation interval groupbox
   QGridLayout *pSimulationIntervalGridLayout = new QGridLayout;
   pSimulationIntervalGridLayout->setColumnStretch(1, 1);
@@ -142,6 +154,10 @@ void SimulationDialog::setUpForm()
   pSimulationIntervalGridLayout->addWidget(mpStartTimeTextBox, 0, 1);
   pSimulationIntervalGridLayout->addWidget(mpStopTimeLabel, 1, 0);
   pSimulationIntervalGridLayout->addWidget(mpStopTimeTextBox, 1, 1);
+  pSimulationIntervalGridLayout->addWidget(mpNumberofIntervalsRadioButton, 2, 0);
+  pSimulationIntervalGridLayout->addWidget(mpNumberofIntervalsSpinBox, 2, 1);
+  pSimulationIntervalGridLayout->addWidget(mpIntervalRadioButton, 3, 0);
+  pSimulationIntervalGridLayout->addWidget(mpIntervalTextBox, 3, 1);
   mpSimulationIntervalGroupBox->setLayout(pSimulationIntervalGridLayout);
   // Integration
   mpIntegrationGroupBox = new QGroupBox(tr("Integration"));
@@ -232,7 +248,7 @@ void SimulationDialog::setUpForm()
   mpNumberOfProcessorsLabel = new Label(tr("Number of Processors:"));
   mpNumberOfProcessorsSpinBox = new QSpinBox;
   mpNumberOfProcessorsSpinBox->setMinimum(1);
-  mpNumberOfProcessorsSpinBox->setValue(mpMainWindow->getOMCProxy()->numProcessors().toInt());
+  mpNumberOfProcessorsSpinBox->setValue(mpMainWindow->getOMCProxy()->numProcessors());
   mpNumberOfProcessorsNoteLabel = new Label(tr("Use 1 processor if you encounter problems during compilation."));
   // build only
   mpBuildOnlyCheckBox = new QCheckBox(tr("Build Only"));
@@ -259,12 +275,6 @@ void SimulationDialog::setUpForm()
   mpSimulationTabWidget->addTab(mpGeneralTab, Helper::general);
   // Output Tab
   mpOutputTab = new QWidget;
-  // Output Interval
-  mpNumberofIntervalLabel = new Label(tr("Number of Intervals:"));
-  mpNumberofIntervalsSpinBox = new QSpinBox;
-  mpNumberofIntervalsSpinBox->setRange(0, std::numeric_limits<int>::max());
-  mpNumberofIntervalsSpinBox->setSingleStep(100);
-  mpNumberofIntervalsSpinBox->setValue(500);
   // Output Format
   mpOutputFormatLabel = new Label(tr("Output Format:"));
   mpOutputFormatComboBox = new QComboBox;
@@ -295,21 +305,19 @@ void SimulationDialog::setUpForm()
   // set Output Tab Layout
   QGridLayout *pOutputTabLayout = new QGridLayout;
   pOutputTabLayout->setAlignment(Qt::AlignTop);
-  pOutputTabLayout->addWidget(mpNumberofIntervalLabel, 0, 0);
-  pOutputTabLayout->addWidget(mpNumberofIntervalsSpinBox, 0, 1, 1, 2);
-  pOutputTabLayout->addWidget(mpOutputFormatLabel, 1, 0);
-  pOutputTabLayout->addWidget(mpOutputFormatComboBox, 1, 1, 1, 2);
-  pOutputTabLayout->addWidget(mpFileNameLabel, 2, 0);
-  pOutputTabLayout->addWidget(mpFileNameTextBox, 2, 1, 1, 2);
-  pOutputTabLayout->addWidget(mpResultFileNameLabel, 3, 0);
-  pOutputTabLayout->addWidget(mpResultFileNameTextBox, 3, 1);
-  pOutputTabLayout->addWidget(mpResultFileName, 3, 2);
-  pOutputTabLayout->addWidget(mpVariableFilterLabel, 4, 0);
-  pOutputTabLayout->addWidget(mpVariableFilterTextBox, 4, 1, 1, 2);
-  pOutputTabLayout->addWidget(mpProtectedVariablesCheckBox, 5, 0, 1, 3);
-  pOutputTabLayout->addWidget(mpEquidistantTimeGridCheckBox, 6, 0, 1, 3);
-  pOutputTabLayout->addWidget(mpStoreVariablesAtEventsCheckBox, 7, 0, 1, 3);
-  pOutputTabLayout->addWidget(mpShowGeneratedFilesCheckBox, 8, 0, 1, 3);
+  pOutputTabLayout->addWidget(mpOutputFormatLabel, 0, 0);
+  pOutputTabLayout->addWidget(mpOutputFormatComboBox, 0, 1, 1, 2);
+  pOutputTabLayout->addWidget(mpFileNameLabel, 1, 0);
+  pOutputTabLayout->addWidget(mpFileNameTextBox, 1, 1, 1, 2);
+  pOutputTabLayout->addWidget(mpResultFileNameLabel, 2, 0);
+  pOutputTabLayout->addWidget(mpResultFileNameTextBox, 2, 1);
+  pOutputTabLayout->addWidget(mpResultFileName, 2, 2);
+  pOutputTabLayout->addWidget(mpVariableFilterLabel, 3, 0);
+  pOutputTabLayout->addWidget(mpVariableFilterTextBox, 3, 1, 1, 2);
+  pOutputTabLayout->addWidget(mpProtectedVariablesCheckBox, 4, 0, 1, 3);
+  pOutputTabLayout->addWidget(mpEquidistantTimeGridCheckBox, 5, 0, 1, 3);
+  pOutputTabLayout->addWidget(mpStoreVariablesAtEventsCheckBox, 6, 0, 1, 3);
+  pOutputTabLayout->addWidget(mpShowGeneratedFilesCheckBox, 7, 0, 1, 3);
   mpOutputTab->setLayout(pOutputTabLayout);
   // add Output Tab to Simulation TabWidget
   mpSimulationTabWidget->addTab(mpOutputTab, Helper::output);
@@ -521,6 +529,7 @@ void SimulationDialog::setUpForm()
   QDoubleValidator *pDoubleValidator = new QDoubleValidator(this);
   mpStartTimeTextBox->setValidator(pDoubleValidator);
   mpStopTimeTextBox->setValidator(pDoubleValidator);
+  mpIntervalTextBox->setValidator(pDoubleValidator);
   mpToleranceTextBox->setValidator(pDoubleValidator);
   // Create the buttons
   mpSimulateButton = new QPushButton(Helper::simulate);
@@ -550,16 +559,16 @@ void SimulationDialog::setUpForm()
   */
 bool SimulationDialog::validate()
 {
-  if (mpStartTimeTextBox->text().isEmpty())
-  {
+  if (mpStartTimeTextBox->text().isEmpty()) {
     mpStartTimeTextBox->setText("0");
   }
-  if (mpStopTimeTextBox->text().isEmpty())
-  {
+  if (mpStopTimeTextBox->text().isEmpty()) {
     mpStopTimeTextBox->setText("1");
   }
-  if (mpStartTimeTextBox->text().toDouble() > mpStopTimeTextBox->text().toDouble())
-  {
+  if (mpIntervalRadioButton->isChecked() && mpIntervalTextBox->text().isEmpty()) {
+    mpIntervalTextBox->setText("0.002");
+  }
+  if (mpStartTimeTextBox->text().toDouble() > mpStopTimeTextBox->text().toDouble()) {
     QMessageBox::critical(mpMainWindow, QString(Helper::applicationName).append(" - ").append(Helper::error),
                           GUIMessages::getMessage(GUIMessages::SIMULATION_STARTTIME_LESSTHAN_STOPTIME), Helper::ok);
     return false;
@@ -581,15 +590,15 @@ void SimulationDialog::initializeFields(bool isReSimulate, SimulationOptions sim
     // if the class has experiment annotation then read it.
     if (mpMainWindow->getOMCProxy()->isExperiment(mClassName)) {
       // get the simulation options....
-      QStringList result = mpMainWindow->getOMCProxy()->getSimulationOptions(mClassName);
+      OMCInterface::getSimulationOptions_res simulationOptions = mpMainWindow->getOMCProxy()->getSimulationOptions(mClassName);
       // since we always get simulationOptions so just get the values from array
-      mpStartTimeTextBox->setText(QString::number(result.at(0).toFloat()));
-      mpStopTimeTextBox->setText(QString::number(result.at(1).toFloat()));
-      mpToleranceTextBox->setText(QString::number(result.at(2).toFloat()));
-      mpNumberofIntervalsSpinBox->setValue(result.at(3).toLong());
+      mpStartTimeTextBox->setText(QString::number(simulationOptions.startTime));
+      mpStopTimeTextBox->setText(QString::number(simulationOptions.stopTime));
+      mpToleranceTextBox->setText(QString::number(simulationOptions.tolerance));
+      mpNumberofIntervalsSpinBox->setValue(simulationOptions.numberOfIntervals);
+      mpIntervalTextBox->setText(QString::number(simulationOptions.interval));
     }
     mpCflagsTextBox->setEnabled(true);
-    mpNumberofIntervalsSpinBox->setEnabled(true);
     mpFileNameTextBox->setEnabled(true);
     mpSaveSimulationCheckbox->setEnabled(true);
     mpSimulateButton->setText(Helper::simulate);
@@ -634,8 +643,10 @@ void SimulationDialog::initializeFields(bool isReSimulate, SimulationOptions sim
     mpLaunchAlgorithmicDebuggerCheckBox->setChecked(simulationOptions.getLaunchAlgorithmicDebugger());
     // build only
     mpBuildOnlyCheckBox->setChecked(simulationOptions.getBuildOnly());
-    // Output Interval
+    // Number Of Intervals
     mpNumberofIntervalsSpinBox->setValue(simulationOptions.getNumberofIntervals());
+    // Interval
+    mpIntervalTextBox->setText(QString::number(simulationOptions.getStepSize()));
     // Output filename
     mpFileNameTextBox->setDisabled(true);
     // Variable filter
@@ -764,7 +775,11 @@ SimulationOptions SimulationDialog::createSimulationOptions()
   simulationOptions.setNumberofIntervals(mpNumberofIntervalsSpinBox->value());
   qreal startTime = mpStartTimeTextBox->text().toDouble();
   qreal stopTime = mpStopTimeTextBox->text().toDouble();
-  simulationOptions.setStepSize((stopTime - startTime)/mpNumberofIntervalsSpinBox->value());
+  if (mpNumberofIntervalsRadioButton->isChecked()) {
+    simulationOptions.setStepSize((stopTime - startTime)/mpNumberofIntervalsSpinBox->value());
+  } else {
+    simulationOptions.setStepSize(mpIntervalTextBox->text().toDouble());
+  }
   simulationOptions.setOutputFormat(mpOutputFormatComboBox->currentText());
   if (!mpFileNameTextBox->text().isEmpty()) {
     simulationOptions.setFileNamePrefix(mpFileNameTextBox->text());
@@ -1016,12 +1031,12 @@ void SimulationDialog::saveSimulationOptions()
   // if the class has experiment annotation then read it.
   if (mpMainWindow->getOMCProxy()->isExperiment(mpLibraryTreeItem->getNameStructure())) {
     // get the simulation options....
-    QStringList result = mpMainWindow->getOMCProxy()->getSimulationOptions(mpLibraryTreeItem->getNameStructure());
+    OMCInterface::getSimulationOptions_res simulationOptions = mpMainWindow->getOMCProxy()->getSimulationOptions(mpLibraryTreeItem->getNameStructure());
     // since we always get simulationOptions so just get the values from array
-    oldExperimentAnnotation.append("StartTime=").append(QString::number(result.at(0).toFloat())).append(",");
-    oldExperimentAnnotation.append("StopTime=").append(QString::number(result.at(1).toFloat())).append(",");
-    oldExperimentAnnotation.append("Tolerance=").append(QString::number(result.at(2).toFloat())).append(",");
-    oldExperimentAnnotation.append("Interval=").append(QString::number(result.at(3).toFloat()));
+    oldExperimentAnnotation.append("StartTime=").append(QString::number(simulationOptions.startTime)).append(",");
+    oldExperimentAnnotation.append("StopTime=").append(QString::number(simulationOptions.stopTime)).append(",");
+    oldExperimentAnnotation.append("Tolerance=").append(QString::number(simulationOptions.tolerance)).append(",");
+    oldExperimentAnnotation.append("Interval=").append(QString::number(simulationOptions.interval));
   }
   oldExperimentAnnotation.append(")");
   QString newExperimentAnnotation;
@@ -1032,10 +1047,14 @@ void SimulationDialog::saveSimulationOptions()
   newExperimentAnnotation.append("Tolerance=").append(mpToleranceTextBox->text()).append(",");
   double interval, stopTime, startTime;
   int numberOfIntervals;
-  stopTime = mpStopTimeTextBox->text().toDouble();
-  startTime = mpStartTimeTextBox->text().toDouble();
-  numberOfIntervals = mpNumberofIntervalsSpinBox->value();
-  interval = (numberOfIntervals == 0) ? 0 : (stopTime - startTime) / numberOfIntervals;
+  if (mpNumberofIntervalsRadioButton->isChecked()) {
+    stopTime = mpStopTimeTextBox->text().toDouble();
+    startTime = mpStartTimeTextBox->text().toDouble();
+    numberOfIntervals = mpNumberofIntervalsSpinBox->value();
+    interval = (numberOfIntervals == 0) ? 0 : (stopTime - startTime) / numberOfIntervals;
+  } else {
+    interval = mpIntervalTextBox->text().toDouble();
+  }
   newExperimentAnnotation.append("Interval=").append(QString::number(interval));
   newExperimentAnnotation.append(")");
   // if we have ModelWidget for class then put the change on undo stack.
@@ -1104,6 +1123,42 @@ void SimulationDialog::simulationProcessFinished(SimulationOptions simulationOpt
 }
 
 /*!
+ * \brief SimulationDialog::numberOfIntervalsRadioToggled
+ * \param toggle
+ */
+void SimulationDialog::numberOfIntervalsRadioToggled(bool toggle)
+{
+  if (toggle) {
+    mpNumberofIntervalsSpinBox->setEnabled(true);
+    mpIntervalTextBox->setEnabled(false);
+    if (validate()) {
+      qreal startTime = mpStartTimeTextBox->text().toDouble();
+      qreal stopTime = mpStopTimeTextBox->text().toDouble();
+      qreal interval = mpIntervalTextBox->text().toDouble();
+      qreal numberOfIntervals = (stopTime - startTime) / interval;
+      mpNumberofIntervalsSpinBox->setValue(numberOfIntervals);
+    }
+  }
+}
+
+/*!
+ * \brief SimulationDialog::intervalRadioToggled
+ * \param toggle
+ */
+void SimulationDialog::intervalRadioToggled(bool toggle)
+{
+  if (toggle) {
+    mpNumberofIntervalsSpinBox->setEnabled(false);
+    mpIntervalTextBox->setEnabled(true);
+    if (validate()) {
+      qreal startTime = mpStartTimeTextBox->text().toDouble();
+      qreal stopTime = mpStopTimeTextBox->text().toDouble();
+      mpIntervalTextBox->setText(QString::number((stopTime - startTime) / mpNumberofIntervalsSpinBox->value()));
+    }
+  }
+}
+
+/*!
  * \brief SimulationDialog::updateMethodToolTip
  * Updates the Method combobox tooltip.
  * \param index
@@ -1114,9 +1169,11 @@ void SimulationDialog::updateMethodToolTip(int index)
 }
 
 /*!
-  Slot activated when mpMethodComboBox currentIndexChanged signal is raised.\n
-  Enables/disables the Dassl options group box
-  */
+ * \brief SimulationDialog::enableDasslOptions
+ * Slot activated when mpMethodComboBox currentIndexChanged signal is raised.\n
+ * Enables/disables the Dassl options group box
+ * \param method
+ */
 void SimulationDialog::enableDasslOptions(QString method)
 {
   if (method.compare("dassl") == 0) {
@@ -1129,9 +1186,10 @@ void SimulationDialog::enableDasslOptions(QString method)
 }
 
 /*!
-  Slot activated when mpMehtodHelpButton clicked signal is raised.\n
-  Opens the IntegrationAlgorithms.pdf file.
-  */
+ * \brief SimulationDialog::showIntegrationHelp
+ * Slot activated when mpMehtodHelpButton clicked signal is raised.\n
+ * Opens the IntegrationAlgorithms.pdf file.
+ */
 void SimulationDialog::showIntegrationHelp()
 {
   QUrl integrationAlgorithmsPath (QString("file:///").append(QString(Helper::OpenModelicaHome).replace("\\", "/"))
@@ -1144,9 +1202,11 @@ void SimulationDialog::showIntegrationHelp()
 }
 
 /*!
-  Slot activated when mpBuildOnlyCheckBox checkbox is checked.\n
-  Makes sure that we only build the modelica model and don't run the simulation.
-  */
+ * \brief SimulationDialog::buildOnly
+ * Slot activated when mpBuildOnlyCheckBox checkbox is checked.\n
+ * Makes sure that we only build the modelica model and don't run the simulation.
+ * \param checked
+ */
 void SimulationDialog::buildOnly(bool checked)
 {
   mpLaunchAlgorithmicDebuggerCheckBox->setEnabled(!checked);
@@ -1154,27 +1214,31 @@ void SimulationDialog::buildOnly(bool checked)
 }
 
 /*!
-  Slot activated when mpModelSetupFileBrowseButton clicked signal is raised.\n
-  Allows user to select Model Setup File.
-  */
+ * \brief SimulationDialog::browseModelSetupFile
+ * Slot activated when mpModelSetupFileBrowseButton clicked signal is raised.\n
+ * Allows user to select Model Setup File.
+ */
 void SimulationDialog::browseModelSetupFile()
 {
   mpModelSetupFileTextBox->setText(StringHandler::getOpenFileName(this,QString(Helper::applicationName).append(" - ").append(Helper::chooseFile), NULL, Helper::xmlFileTypes, NULL));
 }
 
 /*!
-  Slot activated when mpEquationSystemInitializationFileBrowseButton clicked signal is raised.\n
-  Allows user to select Equation System Initialization File.
-  */
+ * \brief SimulationDialog::browseEquationSystemInitializationFile
+ * Slot activated when mpEquationSystemInitializationFileBrowseButton clicked signal is raised.\n
+ * Allows user to select Equation System Initialization File.
+ */
 void SimulationDialog::browseEquationSystemInitializationFile()
 {
   mpEquationSystemInitializationFileTextBox->setText(StringHandler::getOpenFileName(this, QString(Helper::applicationName).append(" - ").append(Helper::chooseFile), NULL, Helper::matFileTypes, NULL));
 }
 
 /*!
-  Slot activated when mpArchivedSimulationsListWidget itemDoubleClicked signal is raised.\n
-  Shows the archived SimulationOutputWidget.
-  */
+ * \brief SimulationDialog::showArchivedSimulation
+ * Slot activated when mpArchivedSimulationsListWidget itemDoubleClicked signal is raised.\n
+ * Shows the archived SimulationOutputWidget.
+ * \param pTreeWidgetItem
+ */
 void SimulationDialog::showArchivedSimulation(QTreeWidgetItem *pTreeWidgetItem)
 {
   ArchivedSimulationItem *pArchivedSimulationItem = dynamic_cast<ArchivedSimulationItem*>(pTreeWidgetItem);
@@ -1187,9 +1251,10 @@ void SimulationDialog::showArchivedSimulation(QTreeWidgetItem *pTreeWidgetItem)
 }
 
 /*!
-  Slot activated when mpSimulateButton clicked signal is raised.\n
-  Reads the simulation options set by the user and sends them to OMC by calling buildModel.
-  */
+ * \brief SimulationDialog::simulate
+ * Slot activated when mpSimulateButton clicked signal is raised.\n
+ * Reads the simulation options set by the user and sends them to OMC by calling buildModel.
+ */
 void SimulationDialog::simulate()
 {
   SimulationOptions simulationOptions;
@@ -1198,7 +1263,16 @@ void SimulationDialog::simulate()
     /* build the simulation parameters */
     simulationParameters.append("startTime=").append(mpStartTimeTextBox->text());
     simulationParameters.append(", stopTime=").append(mpStopTimeTextBox->text());
-    simulationParameters.append(", numberOfIntervals=").append(QString::number(mpNumberofIntervalsSpinBox->value()));
+    QString numberOfIntervals;
+    if (mpNumberofIntervalsRadioButton->isChecked()) {
+      numberOfIntervals = QString::number(mpNumberofIntervalsSpinBox->value());
+    } else {
+      qreal startTime = mpStartTimeTextBox->text().toDouble();
+      qreal stopTime = mpStopTimeTextBox->text().toDouble();
+      qreal interval = mpIntervalTextBox->text().toDouble();
+      numberOfIntervals = QString::number((stopTime - startTime) / interval);
+    }
+    simulationParameters.append(", numberOfIntervals=").append(numberOfIntervals);
     simulationParameters.append(", method=").append("\"").append(mpMethodComboBox->currentText()).append("\"");
     if (!mpToleranceTextBox->text().isEmpty()) {
       simulationParameters.append(", tolerance=").append(mpToleranceTextBox->text());

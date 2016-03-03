@@ -32,14 +32,15 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
-
 
 #include <OMC/Parser/OMCOutputLexer.h>
 #include <OMC/Parser/OMCOutputParser.h>
 #include "meta/meta_modelica.h"
+#ifdef WIN32
+#include "version.h"
+#endif
 
 extern "C" {
 void (*omc_assert)(threadData_t*,FILE_INFO info,const char *msg,...) __attribute__((noreturn)) = omc_assert_function;
@@ -257,9 +258,11 @@ bool OMCProxy::initializeOMC()
   setCommandLineOptions("+locale=" + settingsLocale.name());
   // get OpenModelica version
   Helper::OpenModelicaVersion = getVersion();
+#ifdef WIN32
+  sendCommand("\"" +  QString(GIT_SHA) + "\"");
+#endif
   // set OpenModelicaHome variable
-  sendCommand("getInstallationDirectoryPath()");
-  Helper::OpenModelicaHome = StringHandler::removeFirstLastQuotes(getResult());
+  Helper::OpenModelicaHome = mpOMCInterface->getInstallationDirectoryPath();
 #ifdef WIN32
   MMC_TRY_TOP_INTERNAL()
   omc_Main_setWindowsPaths(threadData, mmc_mk_scon(Helper::OpenModelicaHome.toStdString().c_str()));
@@ -781,7 +784,17 @@ QStringList OMCProxy::searchClassNames(QString searchText, bool findInText)
   */
 OMCInterface::getClassInformation_res OMCProxy::getClassInformation(QString className)
 {
-  return mpOMCInterface->getClassInformation(className);
+  OMCInterface::getClassInformation_res classInformation = mpOMCInterface->getClassInformation(className);
+  QString comment = classInformation.comment.replace("\\\"", "\"");
+  comment = makeDocumentationUriToFileName(comment);
+  // since tooltips can't handle file:// scheme so we have to remove it in order to display images and make links work.
+#ifdef WIN32
+  comment.replace("src=\"file:///", "src=\"");
+#else
+  comment.replace("src=\"file://", "src=\"");
+#endif
+  classInformation.comment = comment;
+  return classInformation;
 }
 
 /*!
@@ -1251,19 +1264,33 @@ QStringList OMCProxy::getComponentAnnotations(QString className)
   return StringHandler::getStrings(StringHandler::removeFirstLastCurlBrackets(getResult()));
 }
 
-/*!
-  Returns the documentation annotation of a model.\n
-  The documenation is not standardized, so for any non-standard html documentation add <pre></pre> tags.
-  \param className - is the name of the model.
-  \return the documentation.
-  */
-QString OMCProxy::getDocumentationAnnotation(QString className)
+QString OMCProxy::getDocumentationAnnotationInfoHeader(LibraryTreeItem *pLibraryTreeItem, QString infoHeader)
 {
-  QList<QString> docsList = mpOMCInterface->getDocumentationAnnotation(className);
+  if (pLibraryTreeItem && !pLibraryTreeItem->isRootItem()) {
+    QList<QString> docsList = mpOMCInterface->getDocumentationAnnotation(pLibraryTreeItem->getNameStructure());
+    infoHeader.prepend(docsList.at(2)); // __OpenModelica_infoHeader section is the 3rd item in the list
+    return getDocumentationAnnotationInfoHeader(pLibraryTreeItem->parent(), infoHeader);
+  } else {
+    return infoHeader;
+  }
+}
+
+/*!
+ * \brief OMCProxy::getDocumentationAnnotation
+ * Returns the documentation annotation of a model.\n
+ * The documenation is not standardized, so for any non-standard html documentation add <pre></pre> tags.
+ * \param pLibraryTreeItem
+ * \return the documentation
+ */
+QString OMCProxy::getDocumentationAnnotation(LibraryTreeItem *pLibraryTreeItem)
+{
+  QList<QString> docsList = mpOMCInterface->getDocumentationAnnotation(pLibraryTreeItem->getNameStructure());
+  QString infoHeader = "";
+  infoHeader = getDocumentationAnnotationInfoHeader(pLibraryTreeItem->parent(), infoHeader);
   // get the class comment and show it as the first line on the documentation page.
-  QString doc = getClassComment(className);
+  QString doc = getClassComment(pLibraryTreeItem->getNameStructure());
   if (!doc.isEmpty()) doc.prepend("<h4>").append("</h4>");
-  doc.prepend(QString("<h2>").append(className).append("</h2>"));
+  doc.prepend(QString("<h2>").append(pLibraryTreeItem->getNameStructure()).append("</h2>"));
   for (int ele = 0 ; ele < docsList.size() ; ele++) {
     QString docElement = docsList[ele];
     if (docElement.isEmpty()) {
@@ -1273,31 +1300,23 @@ QString OMCProxy::getDocumentationAnnotation(QString className)
       doc += "<p style=\"font-size:12px;\"><strong><u>Information</u></strong></p>";
     } else if (ele == 1) {    // revisions section
       doc += "<p style=\"font-size:12px;\"><strong><u>Revisions</u></strong></p>";
+    } else if (ele == 2) {    // __OpenModelica_infoHeader section
+      infoHeader.append(docElement);
+      continue;
     }
-    int i,j;
-    /*
-     * Documentation may have the form
-     * text <HTML>...</html> text <html>...</HTML> [...]
-     * Nothing is standardized, but we will treat non-html tags as <pre>-formatted text
-     */
-    while (1) {
-      docElement = docElement.trimmed();
-      i = docElement.indexOf("<html>", 0, Qt::CaseInsensitive);
-      if (i == -1) break;
-      if (i != 0) {
-        doc += "<pre>" + docElement.left(i).replace("<","&lt;").replace(">","&gt;") + "</pre>";
-        docElement = docElement.remove(i);
-      }
-      j = docElement.indexOf("</html>", 0, Qt::CaseInsensitive);
-      if (j == -1) break;
-      doc += docElement.leftRef(j+7);
-      docElement = docElement.mid(j+7,-1);
-    }
-    if (docElement.length()) {
-      doc += "<pre>" + docElement.replace("<","&lt;").replace(">","&gt;") + "</pre>";
-    }
+    docElement = docElement.trimmed();
+    docElement.remove(QRegExp("<html>|</html>|<HTML>|</HTML>|<head>|</head>|<HEAD>|</HEAD>|<body>|</body>|<BODY>|</BODY>"));
+    doc += docElement;
   }
-  QString documentation = makeDocumentationUriToFileName(doc);
+  QString documentation = QString("<html>\n"
+                                  "  <head>\n"
+                                  "    %1\n"
+                                  "  </head>\n"
+                                  "  <body>\n"
+                                  "    %2\n"
+                                  "  </body>\n"
+                                  "</html>").arg(infoHeader).arg(doc);
+  documentation = makeDocumentationUriToFileName(documentation);
   /*! @note We convert modelica:// to modelica:///.
     * This tells QWebview that these links doesn't have any host.
     * Why we are doing this. Because,
@@ -1310,10 +1329,13 @@ QString OMCProxy::getDocumentationAnnotation(QString className)
 }
 
 /*!
-  Gets the class comment.
-  \param className - is the name of the class.
-  \return class comment.
-  */
+ * \brief OMCProxy::getClassComment
+ * Gets the class comment.
+ * \param className - is the name of the class.
+ * \return class comment.
+ * \param className
+ * \return
+ */
 QString OMCProxy::getClassComment(QString className)
 {
   return mpOMCInterface->getClassComment(className);
@@ -1497,30 +1519,31 @@ bool OMCProxy::deleteClass(QString className)
 }
 
 /*!
-  Returns the file name of a model.
-  \param className - the name of the class.
-  \return the file name.
-  */
+ * \brief OMCProxy::getSourceFile
+ * Returns the file name of a model.
+ * \param className - the name of the class.
+ * \return the file name.
+ */
 QString OMCProxy::getSourceFile(QString className)
 {
-  sendCommand("getSourceFile(" + className + ")");
-  QString file = StringHandler::unparse(getResult());
-  if (file.compare("<interactive>") == 0)
+  QString file = mpOMCInterface->getSourceFile(className);
+  if (file.compare("<interactive>") == 0) {
     return "";
-  else
+  } else {
     return file;
+  }
 }
 
 /*!
-  Sets a file name of a model.
-  \param className - the name of the class.
-  \param path - the full location
-  \return true on success.
-  */
+ * \brief OMCProxy::setSourceFile
+ * Sets a file name of a model.
+ * \param className - the name of the class.
+ * \param path - the full location
+ * \return true on success.
+ */
 bool OMCProxy::setSourceFile(QString className, QString path)
 {
-  sendCommand("setSourceFile(" + className + ", \"" + path + "\")");
-  return StringHandler::unparseBool(getResult());
+  return mpOMCInterface->setSourceFile(className, path);
 }
 
 /*!
@@ -1604,8 +1627,18 @@ QString OMCProxy::diffModelicaFileListings(QString before, QString after)
 {
   QString escapedBefore = StringHandler::escapeString(before);
   QString escapedAfter = StringHandler::escapeString(after);
-  // sendCommand("diffModelicaFileListings(\"" + escapedBefore + "\", \"" + escapedAfter + "\", OpenModelica.Scripting.DiffFormat.plain)");
-  QString result = after; // StringHandler::unparse(getResult());
+  QString result;
+  // only use the diffModelicaFileListings when preserve text indentation settings is true
+  if (mpMainWindow->getOptionsDialog()->getModelicaTextEditorPage()->getPreserveTextIndentationCheckBox()->isChecked()) {
+    sendCommand("diffModelicaFileListings(\"" + escapedBefore + "\", \"" + escapedAfter + "\", OpenModelica.Scripting.DiffFormat.plain)");
+    result = StringHandler::unparse(getResult());
+    printMessagesStringInternal();
+    if (result.isEmpty()) {
+      result = after; // use omc pretty-printing since diffModelicaFileListings() failed.
+    }
+  } else {
+    result = after;
+  }
   if (mpMainWindow->isDebug()) {
     mpOMCDiffBeforeTextBox->setPlainText(before);
     mpOMCDiffAfterTextBox->setPlainText(after);
@@ -1853,20 +1886,22 @@ bool OMCProxy::deleteConnection(QString from, QString to, QString className)
 }
 
 /*!
-  Simulate the model. Creates an execuatble and runs it.
-  \param className - the name of the class.
-  \param simualtionParameters - the simulation parameters.
-  \return true on success.
-  \deprecated OMEdit only use OMCProxy::buildModel(QString className, QString simualtionParameters)
-  */
+ * \brief OMCProxy::simulate
+ * Simulate the model. Creates an execuatble and runs it.
+ * \param className - the name of the class.
+ * \param simualtionParameters - the simulation parameters.
+ * \return true on success.
+ * \deprecated OMEdit only use OMCProxy::buildModel(QString className, QString simualtionParameters)
+ */
 bool OMCProxy::simulate(QString className, QString simualtionParameters)
 {
   sendCommand("OMEdit_simulate_result:=simulate(" + className + "," + simualtionParameters + ")");
   sendCommand("OMEdit_simulate_result.resultFile");
-  if (StringHandler::unparse(getResult()).isEmpty())
+  if (StringHandler::unparse(getResult()).isEmpty()) {
     return false;
-  else
+  } else {
     return true;
+  }
 }
 
 /*!
@@ -1900,44 +1935,44 @@ bool OMCProxy::translateModel(QString className, QString simualtionParameters)
 }
 
 /*!
-  Reads the simulation result variables from the result file.
-  \param fileName - the result file name
-  \return the list of variables.
-  */
+ * \brief OMCProxy::readSimulationResultVars
+ * Reads the simulation result variables from the result file.
+ * \param fileName - the result file name
+ * \return the list of variables.
+ */
 QStringList OMCProxy::readSimulationResultVars(QString fileName)
 {
-  sendCommand("readSimulationResultVars(\"" + fileName + "\")");
-  QStringList variablesList = StringHandler::unparseStrings(getResult());
+  QStringList variablesList = mpOMCInterface->readSimulationResultVars(fileName, true, false);
   qSort(variablesList.begin(), variablesList.end());
   printMessagesStringInternal();
   return variablesList;
 }
 
 /*!
-  Closes the current simulation result file.\n
-  Only valid for Windows.\n
-  On Linux it simply returns true without doing anything.
-  \return true on success.
-  */
+ * \brief OMCProxy::closeSimulationResultFile
+ * Closes the current simulation result file.\n
+ * Only valid for Windows.\n
+ * On Linux it simply returns true without doing anything.
+ * \return true on success.
+ */
 bool OMCProxy::closeSimulationResultFile()
 {
 #ifdef Q_OS_WIN
-  sendCommand("closeSimulationResultFile()");
-  return StringHandler::unparseBool(getResult());
+  return mpOMCInterface->closeSimulationResultFile();
 #else
   return true;
 #endif
 }
 
 /*!
-  Checks the model. Checks model balance in terms of number of variables and equations.
-  \param className - the name of the class.
-  \return the model check result
-  */
+ * \brief OMCProxy::checkModel
+ * Checks the model. Checks model balance in terms of number of variables and equations.
+ * \param className - the name of the class.
+ * \return the model check result
+ */
 QString OMCProxy::checkModel(QString className)
 {
-  sendCommand("checkModel(" + className + ")");
-  QString result = StringHandler::unparse(getResult());
+  QString result = mpOMCInterface->checkModel(className);
   printMessagesStringInternal();
   mpMainWindow->getLibraryWidget()->getLibraryTreeModel()->loadDependentLibraries(getClassNames());
   return result;
@@ -1957,54 +1992,54 @@ bool OMCProxy::ngspicetoModelica(QString fileName)
 }
 
 /*!
-  Checks all nested modelica classes. Checks model balance in terms of number of variables and equations.
-  \param className - the name of the class.
-  \return the model check result
-  */
+ * \brief OMCProxy::checkAllModelsRecursive
+ * Checks all nested modelica classes. Checks model balance in terms of number of variables and equations.
+ * \param className - the name of the class.
+ * \return the model check result
+ */
 QString OMCProxy::checkAllModelsRecursive(QString className)
 {
-  sendCommand("checkAllModelsRecursive(" + className + ")");
-  QString result = StringHandler::unparse(getResult());
+  QString result = mpOMCInterface->checkAllModelsRecursive(className, false);
   printMessagesStringInternal();
   mpMainWindow->getLibraryWidget()->getLibraryTreeModel()->loadDependentLibraries(getClassNames());
   return result;
 }
 
 /*!
-  Instantiates the model.
-  \param className - the name of the class.
-  \return the instantiated model
-  */
+ * \brief OMCProxy::instantiateModel
+ * Instantiates the model.
+ * \param className - the name of the class.
+ * \return the instantiated model
+ */
 QString OMCProxy::instantiateModel(QString className)
 {
-  sendCommand("instantiateModel(" + className + ")");
-  QString result = StringHandler::unparse(getResult());
+  QString result = mpOMCInterface->instantiateModel(className);
   printMessagesStringInternal();
   mpMainWindow->getLibraryWidget()->getLibraryTreeModel()->loadDependentLibraries(getClassNames());
   return result;
 }
 
 /*!
-  Returns the simulation options stored in the model.
-  \param className - the name of the class.
-  \return the simulation options
-  */
+ * \brief OMCProxy::isExperiment
+ * Returns the simulation options stored in the model.
+ * \param className - the name of the class.
+ * \return the simulation options
+ */
 bool OMCProxy::isExperiment(QString className)
 {
-  sendCommand("isExperiment(" + className + ")");
-  return StringHandler::unparseBool(getResult());
+  return mpOMCInterface->isExperiment(className);
 }
 
 /*!
-  Returns the simulation options stored in the model.
-  \param className - the name of the class.
-  \return the simulation options
-  */
-QStringList OMCProxy::getSimulationOptions(QString className, double defaultTolerance)
+ * \brief OMCProxy::getSimulationOptions
+ * Returns the simulation options stored in the model.
+ * \param className - the name of the class.
+ * \param defaultTolerance
+ * \return the simulation options
+ */
+OMCInterface::getSimulationOptions_res OMCProxy::getSimulationOptions(QString className, double defaultTolerance)
 {
-  sendCommand("getSimulationOptions(" + className + ", defaultTolerance=" + QString::number(defaultTolerance) +")");
-  QString result = StringHandler::removeFirstLastBrackets(getResult());
-  return result.split(",");
+  return mpOMCInterface->getSimulationOptions(className, 0.0, 1.0, defaultTolerance, 500, 0.0);
 }
 
 /*!
@@ -2047,26 +2082,21 @@ bool OMCProxy::translateModelXML(QString className)
 }
 
 /*!
-  Imports the FMU
-  \param fmuName - the FMU location
-  \param outputDirectory - the output location
-  \param logLevel - the logging level
-  \param debugLogging - enables the debug logging for the imported FMU.
-  \param generateInputConnectors - generates the input variables as connectors
-  \param generateOutputConnectors - generates the output variables as connectors.
-  \return generated Modelica Code file path
-  */
+ * \brief OMCProxy::importFMU
+ * Imports the FMU
+ * \param fmuName - the FMU location
+ * \param outputDirectory - the output location
+ * \param logLevel - the logging level
+ * \param debugLogging - enables the debug logging for the imported FMU.
+ * \param generateInputConnectors - generates the input variables as connectors
+ * \param generateOutputConnectors - generates the output variables as connectors.
+ * \return generated Modelica Code file path
+ */
 QString OMCProxy::importFMU(QString fmuName, QString outputDirectory, int logLevel, bool debugLogging, bool generateInputConnectors,
                             bool generateOutputConnectors)
 {
-  QString debugLoggingString = debugLogging ? "true" : "false";
-  QString generateInputConnectorsString = generateInputConnectors ? "true" : "false";
-  QString generateOutputConnectorsString = generateOutputConnectors ? "true" : "false";
-  if (outputDirectory.isEmpty())
-    sendCommand("importFMU(\"" + fmuName + "\", loglevel=" + QString::number(logLevel) + ", fullPath=true, debugLogging=" + debugLoggingString + ", generateInputConnectors=" + generateInputConnectorsString + ", generateOutputConnectors=" + generateOutputConnectorsString + ")");
-  else
-    sendCommand("importFMU(\"" + fmuName + "\", \"" + outputDirectory.replace("\\", "/") + "\", loglevel=" + QString::number(logLevel) + ", fullPath=true, debugLogging=" + debugLoggingString + ", generateInputConnectors=" + generateInputConnectorsString + ", generateOutputConnectors=" + generateOutputConnectorsString + ")");
-  QString fmuFileName = StringHandler::unparse(getResult());
+  outputDirectory = outputDirectory.isEmpty() ? "<default>" : outputDirectory;
+  QString fmuFileName = mpOMCInterface->importFMU(fmuName, outputDirectory, logLevel, true, debugLogging, generateInputConnectors, generateOutputConnectors);
   printMessagesStringInternal();
   return fmuFileName;
 }
@@ -2077,36 +2107,27 @@ QString OMCProxy::importFMU(QString fmuName, QString outputDirectory, int logLev
   */
 QString OMCProxy::getMatchingAlgorithm()
 {
-  sendCommand("getMatchingAlgorithm()");
-  return StringHandler::unparse(getResult());
+  return mpOMCInterface->getMatchingAlgorithm();
 }
 
 /*!
-  Reads the list of available matching algorithms.
-  \param choices (Output) - the list of matching algorithm choices
-  \param comments (Output) - the list of matching algorithm choices comments
-  */
-void OMCProxy::getAvailableMatchingAlgorithms(QStringList *choices, QStringList *comments)
+ * \brief OMCProxy::getAvailableMatchingAlgorithms
+ * Reads the list of available matching algorithms.
+ * \return
+ */
+OMCInterface::getAvailableMatchingAlgorithms_res OMCProxy::getAvailableMatchingAlgorithms()
 {
-  sendCommand("getAvailableMatchingAlgorithms()");
-  QStringList resultList = StringHandler::unparseArrays(getResult());
-  if (resultList.size() == 2)
-  {
-    *choices = StringHandler::unparseStrings(resultList.at(0));
-    *comments = StringHandler::unparseStrings(resultList.at(1));
-  }
-  else
-    printMessagesStringInternal();
+  return mpOMCInterface->getAvailableMatchingAlgorithms();
 }
 
 /*!
-  Reads the index reduction method used during the simulation.
-  \return the name of the index reduction method.
-  */
+ * \brief OMCProxy::getIndexReductionMethod
+ * Reads the index reduction method used during the simulation.
+ * \return the name of the index reduction method.
+ */
 QString OMCProxy::getIndexReductionMethod()
 {
-  sendCommand("getIndexReductionMethod()");
-  return StringHandler::unparse(getResult());
+  return mpOMCInterface->getIndexReductionMethod();
 }
 
 /*!
@@ -2117,31 +2138,22 @@ QString OMCProxy::getIndexReductionMethod()
 bool OMCProxy::setMatchingAlgorithm(QString matchingAlgorithm)
 {
   sendCommand("setMatchingAlgorithm(\"" + matchingAlgorithm + "\")");
-  if (StringHandler::unparseBool(getResult()))
+  if (StringHandler::unparseBool(getResult())) {
     return true;
-  else
-  {
+  } else {
     printMessagesStringInternal();
     return false;
   }
 }
 
 /*!
-  Reads the list of available index reduction methods.
-  \param choices (Output) - the list of index reduction methods choices
-  \param comments (Output) - the list of index reduction methods comments
-  */
-void OMCProxy::getAvailableIndexReductionMethods(QStringList *choices, QStringList *comments)
+ * \brief OMCProxy::getAvailableIndexReductionMethods
+ * Reads the list of available index reduction methods.
+ * \return
+ */
+OMCInterface::getAvailableIndexReductionMethods_res OMCProxy::getAvailableIndexReductionMethods()
 {
-  sendCommand("getAvailableIndexReductionMethods()");
-  QStringList resultList = StringHandler::unparseArrays(getResult());
-  if (resultList.size() == 2)
-  {
-    *choices = StringHandler::unparseStrings(resultList.at(0));
-    *comments = StringHandler::unparseStrings(resultList.at(1));
-  }
-  else
-    printMessagesStringInternal();
+  return mpOMCInterface->getAvailableIndexReductionMethods();
 }
 
 /*!
@@ -2177,53 +2189,53 @@ bool OMCProxy::setCommandLineOptions(QString options)
 }
 
 /*!
-  Clears the OMC flags.
-  \return true on success
-  */
+ * \brief OMCProxy::clearCommandLineOptions
+ * Clears the OMC flags.
+ * \return true on success
+ */
 bool OMCProxy::clearCommandLineOptions()
 {
-  sendCommand("clearCommandLineOptions()");
-  if (StringHandler::unparseBool(getResult()))
+  bool result = mpOMCInterface->clearCommandLineOptions();
+  if (result) {
     return true;
-  else
-  {
+  } else {
     printMessagesStringInternal();
     return false;
   }
 }
 
 /*!
-  Helper function for getDocumentationAnnotation. Takes the documentation html and replaces the modelica links with absolute pahts.\n
-  This function also makes the html valid. e.g html like,\n
-    <p>Test</p><html><body>This is body</body></html>\n
-   will become,\n
-    <html><head></head><body><p>Test</p>This is body</body></html>
-  \param documentation - in html form.
-  \return New documentation in html form.
-  */
+ * \brief OMCProxy::makeDocumentationUriToFileName
+ * Helper function for getDocumentationAnnotation. Takes the documentation html and replaces the modelica links with absolute pahts.\n
+ * This function also makes the html valid. e.g html like,\n
+ *   <p>Test</p><html><body>This is body</body></html>\n
+ *  will become,\n
+ *   <html><head></head><body><p>Test</p>This is body</body></html>
+ * \param documentation - in html form.
+ * \return New documentation in html form.
+ */
 QString OMCProxy::makeDocumentationUriToFileName(QString documentation)
 {
-  QWebPage webPage;
-  QWebFrame *pWebFrame = webPage.mainFrame();
-  pWebFrame->setHtml(documentation);
+  QWebPage *pWebPage = new QWebPage;
+  pWebPage->settings()->setAttribute(QWebSettings::JavascriptEnabled, false);
+  connect(pWebPage, SIGNAL(loadFinished(bool)), pWebPage, SLOT(deleteLater()));
+  QWebFrame *pWebFrame = pWebPage->mainFrame();
+  pWebFrame->setContent(QByteArray(documentation.toStdString().c_str()), "text/html");
   QWebElement webElement = pWebFrame->documentElement();
-  QWebElementCollection imgTags = webElement.findAll("img,script");
-  foreach (QWebElement imgTag, imgTags)
-  {
-    QString src = imgTag.attribute("src");
-    if (src.startsWith("modelica://")) {
-      QString imgFileName = uriToFilename(src);
-      imgTag.setAttribute("src", imgFileName);
-    } else if (src.startsWith("file://")) {
-      QString imgFileName = uriToFilename(src);
-      /*
-        Windows absolute paths doesn't start with "/".
-        */
+  QWebElementCollection tags = webElement.findAll("img,script,link");
+  foreach (QWebElement tag, tags) {
+    QString attributeName = "src";
+    if (tag.tagName().toLower().compare("link") == 0) {
+      attributeName = "href";
+    }
+    QString attributeValue = tag.attribute(attributeName);
+    if (attributeValue.startsWith("modelica://")) {
+      QString imgFileName = uriToFilename(attributeValue);
 #ifdef WIN32
-      if (imgFileName.startsWith("/"))
-        imgFileName = imgFileName.mid(1);
+      tag.setAttribute(attributeName, "file:///" + imgFileName);
+#else
+      tag.setAttribute(attributeName, "file://" + imgFileName);
 #endif
-      imgTag.setAttribute("src", imgFileName);
     } else {
       //! @todo The img src value starts with modelica:// for MSL 3.2.1. Handle the other cases in this else block.
     }
@@ -2243,47 +2255,47 @@ QString OMCProxy::uriToFilename(QString uri)
   result = result.prepend("{").append("}");
   QStringList results = StringHandler::unparseStrings(result);
   /* the second argument of uriToFilename result is error string. */
-  if (results.size() > 1 && !results.at(1).isEmpty())
-  {
+  if (results.size() > 1 && !results.at(1).isEmpty()) {
     QString errorString = results.at(1);
     mpMainWindow->getMessagesWidget()->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0, errorString,
                                                                  Helper::scriptingKind, Helper::errorLevel));
   }
-  if (results.size() > 0)
+  if (results.size() > 0) {
     return results.first();
-  else
+  } else {
     return "";
+  }
 }
 
 /*!
-  Gets the modelica library path
-  \return the library path
-  */
+ * \brief OMCProxy::getModelicaPath
+ * Gets the modelica library path
+ * \return the library path
+ */
 QString OMCProxy::getModelicaPath()
 {
-  sendCommand("getModelicaPath()");
-  QString result = StringHandler::unparse(getResult());
+  QString result = mpOMCInterface->getModelicaPath();
   printMessagesStringInternal();
   return result;
 }
 
 /*!
-  Gets the available OpenModelica libraries.
-  \return the list of libaries.
-  */
+ * \brief OMCProxy::getAvailableLibraries
+ * Gets the available OpenModelica libraries.
+ * \return the list of libaries.
+ */
 QStringList OMCProxy::getAvailableLibraries()
 {
-  sendCommand("getAvailableLibraries()");
-  QString result = getResult();
-  return StringHandler::unparseStrings(result);
+  return mpOMCInterface->getAvailableLibraries();
 }
 
 /*!
-  Gets the derived class modifier value.
-  \param className - the name of the derived class.
-  \param modifierName - the modifier name.
-  \return the value of the modifier.
-  */
+ * \brief OMCProxy::getDerivedClassModifierValue
+ * Gets the derived class modifier value.
+ * \param className - the name of the derived class.
+ * \param modifierName - the modifier name.
+ * \return the value of the modifier.
+ */
 QString OMCProxy::getDerivedClassModifierValue(QString className, QString modifierName)
 {
   sendCommand("getDerivedClassModifierValue(" + className + "," + modifierName + ")");
@@ -2302,32 +2314,57 @@ bool OMCProxy::getDocumentationClassAnnotation(QString className)
 }
 
 /*!
-  Gets the number of processors.
-  \return the number of processors.
-  */
-QString OMCProxy::numProcessors()
+ * \brief OMCProxy::numProcessors
+ * Gets the number of processors.
+ * \return the number of processors.
+ */
+int OMCProxy::numProcessors()
 {
-  sendCommand("numProcessors()");
-  return getResult();
+  return mpOMCInterface->numProcessors();
 }
 
+/*!
+ * \brief OMCProxy::help
+ * \param topic
+ * \return
+ */
 QString OMCProxy::help(QString topic)
 {
-  sendCommand("help(\"" + topic + "\")");
-  return StringHandler::unparse(getResult());
+  return mpOMCInterface->help(topic);
 }
 
+/*!
+ * \brief OMCProxy::getConfigFlagValidOptions
+ * \param topic
+ * \return
+ */
 OMCInterface::getConfigFlagValidOptions_res OMCProxy::getConfigFlagValidOptions(QString topic)
 {
   return mpOMCInterface->getConfigFlagValidOptions(topic);
 }
 
+/*!
+ * \brief OMCProxy::setDebugFlags
+ * \param debugFlags
+ * \return
+ */
 bool OMCProxy::setDebugFlags(QString debugFlags)
 {
   sendCommand("setDebugFlags(\"" + debugFlags + "\")");
   return StringHandler::unparseBool(getResult());
 }
 
+/*!
+ * \brief OMCProxy::exportToFigaro
+ * Exports the model to figaro
+ * \param className
+ * \param directory
+ * \param database
+ * \param mode
+ * \param options
+ * \param processor
+ * \return
+ */
 bool OMCProxy::exportToFigaro(QString className, QString directory, QString database, QString mode, QString options, QString processor)
 {
   bool result = false;
@@ -2339,21 +2376,16 @@ bool OMCProxy::exportToFigaro(QString className, QString directory, QString data
 }
 
 /*!
-  Copies the class with new name to within path.
-  \param className - the class that should be copied
-  \param newClassName - the name for new class
-  \param withIn - the with in path for new class
-  */
+ * \brief OMCProxy::copyClass
+ * Copies the class with new name to within path.
+ * \param className - the class that should be copied
+ * \param newClassName - the name for new class
+ * \param withIn - the with in path for new class
+ * \return
+ */
 bool OMCProxy::copyClass(QString className, QString newClassName, QString withIn)
 {
-  QString expression;
-  if (withIn.isEmpty()) {
-    expression = "copyClass(" + className + ",\"" + newClassName + "\")";
-  } else {
-    expression = "copyClass(" + className + ",\"" + newClassName + "\"," + withIn + ")";
-  }
-  sendCommand(expression);
-  bool result = StringHandler::unparseBool(getResult());
+  bool result = mpOMCInterface->copyClass(className, newClassName, withIn.isEmpty() ? "TopLevel" : withIn);
   if (!result) printMessagesStringInternal();
   return result;
 }
@@ -2459,6 +2491,19 @@ bool OMCProxy::moveClassToTop(QString className)
 bool OMCProxy::moveClassToBottom(QString className)
 {
   return mpOMCInterface->moveClassToBottom(className);
+}
+
+/*!
+ * \brief OMCProxy::inferBindings
+ * Updates the bindings.
+ * \param className
+ * \return
+ */
+bool OMCProxy::inferBindings(QString className)
+{
+  bool result = mpOMCInterface->inferBindings(className);
+  printMessagesStringInternal();
+  return result;
 }
 
 /*!

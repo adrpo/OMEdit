@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -229,6 +228,8 @@ signals:
   void keyPressDelete();
   void keyPressRotateClockwise();
   void keyPressRotateAntiClockwise();
+  void keyPressFlipHorizontal();
+  void keyPressFlipVertical();
   void keyPressUp();
   void keyPressShiftUp();
   void keyPressCtrlUp();
@@ -251,7 +252,7 @@ public slots:
   void zoomOut();
   void selectAll();
   void clearSelection();
-  void addClassAnnotation();
+  void addClassAnnotation(bool alwaysAdd = true);
   void showGraphicsViewProperties();
   void manhattanizeItems();
   void deleteItems();
@@ -354,12 +355,13 @@ public:
   void createModelWidgetComponents();
   Component* getConnectorComponent(Component *pConnectorComponent, QString connectorName);
   void reDrawModelWidget();
-  bool validateText();
-  bool modelicaEditorTextChanged();
+  bool validateText(LibraryTreeItem **pLibraryTreeItem);
+  bool modelicaEditorTextChanged(LibraryTreeItem **pLibraryTreeItem);
   void updateChildClasses(LibraryTreeItem *pLibraryTreeItem);
   void clearSelection();
   void updateClassAnnotationIfNeeded();
   void updateModelicaText();
+  void updateModelicaTextManually(QString contents);
   void updateUndoRedoActions();
 private:
   ModelWidgetContainer *mpModelWidgetContainer;

@@ -31,7 +31,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -95,7 +94,7 @@ typedef QVector<Parenthesis> Parentheses;
 class TextBlockUserData : public QTextBlockUserData
 {
 public:
-  inline TextBlockUserData() {}
+  inline TextBlockUserData() {mLeadingSpaces = -1;}
   ~TextBlockUserData();
 
   inline TextMarks marks() const { return _marks; }
@@ -120,9 +119,12 @@ public:
   static MatchType checkClosedParenthesis(QTextCursor *cursor, QChar c);
   static MatchType matchCursorBackward(QTextCursor *cursor);
   static MatchType matchCursorForward(QTextCursor *cursor);
+  inline void setLeadingSpaces(int leadingSpaces) {mLeadingSpaces = leadingSpaces;}
+  inline int getLeadingSpaces() {return mLeadingSpaces;}
 private:
   TextMarks _marks;
   QVector<Parenthesis> mParentheses;
+  int mLeadingSpaces;
 };
 
 class BaseEditorDocumentLayout : public QPlainTextDocumentLayout

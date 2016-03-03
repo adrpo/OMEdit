@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -368,7 +367,7 @@ Component::Component(QString name, LibraryTreeItem *pLibraryTreeItem, QString tr
   createActions();
   mpOriginItem = new OriginItem(this);
   createResizerItems();
-  setToolTip(tr("<b>%1</b> %2").arg(mpComponentInfo->getClassName()).arg(mpComponentInfo->getName()));
+  updateToolTip();
   if (mpLibraryTreeItem) {
     connect(mpLibraryTreeItem, SIGNAL(loadedForComponent()), SLOT(handleLoaded()));
     connect(mpLibraryTreeItem, SIGNAL(unLoadedForComponent()), SLOT(handleUnloaded()));
@@ -419,8 +418,7 @@ Component::Component(Component *pComponent, Component *pParentComponent, Compone
   mTransformation = Transformation(mpReferenceComponent->mTransformation);
   setTransform(mTransformation.getTransformationMatrix());
   mpOriginItem = 0;
-  setToolTip(tr("<b>%1</b> %2<br /><br />Component declared in %3").arg(mpComponentInfo->getClassName()).arg(mpComponentInfo->getName())
-             .arg(mpReferenceComponent->getGraphicsView()->getModelWidget()->getLibraryTreeItem()->getNameStructure()));
+  updateToolTip();
   if (mpLibraryTreeItem) {
     connect(mpLibraryTreeItem, SIGNAL(loadedForComponent()), SLOT(handleLoaded()));
     connect(mpLibraryTreeItem, SIGNAL(unLoadedForComponent()), SLOT(handleUnloaded()));
@@ -465,8 +463,7 @@ Component::Component(Component *pComponent, GraphicsView *pGraphicsView)
   mpGraphicsView->addItem(mpOriginItem);
   createResizerItems();
   mpGraphicsView->addItem(this);
-  setToolTip(tr("<b>%1</b> %2<br /><br />Component declared in %3").arg(mpComponentInfo->getClassName()).arg(mpComponentInfo->getName())
-             .arg(mpReferenceComponent->getGraphicsView()->getModelWidget()->getLibraryTreeItem()->getNameStructure()));
+  updateToolTip();
   if (mpLibraryTreeItem) {
     connect(mpLibraryTreeItem, SIGNAL(loadedForComponent()), SLOT(handleLoaded()));
     connect(mpLibraryTreeItem, SIGNAL(unLoadedForComponent()), SLOT(handleUnloaded()));
@@ -533,18 +530,21 @@ bool Component::hasNonExistingClass()
       return nonExistingClassFound;
     }
   }
-  foreach (Component *pChildComponent, mComponentsList) {
-    nonExistingClassFound = pChildComponent->hasNonExistingClass();
-    if (nonExistingClassFound) {
-      return nonExistingClassFound;
-    }
-    foreach (Component *pInheritedComponent, pChildComponent->getInheritedComponentsList()) {
-      nonExistingClassFound = pInheritedComponent->hasNonExistingClass();
-      if (nonExistingClassFound) {
-        return nonExistingClassFound;
-      }
-    }
-  }
+  /* Ticket #3706
+   * Don't check components because we should not display class as missing one of components class is missing.
+   */
+//  foreach (Component *pChildComponent, mComponentsList) {
+//    nonExistingClassFound = pChildComponent->hasNonExistingClass();
+//    if (nonExistingClassFound) {
+//      return nonExistingClassFound;
+//    }
+//    foreach (Component *pInheritedComponent, pChildComponent->getInheritedComponentsList()) {
+//      nonExistingClassFound = pInheritedComponent->hasNonExistingClass();
+//      if (nonExistingClassFound) {
+//        return nonExistingClassFound;
+//      }
+//    }
+//  }
   return nonExistingClassFound;
 }
 
@@ -812,9 +812,9 @@ void Component::applyRotation(qreal angle)
 void Component::addConnectionDetails(LineAnnotation *pConnectorLineAnnotation)
 {
   // handle component position, rotation and scale changes
-  connect(this, SIGNAL(transformChange()), pConnectorLineAnnotation, SLOT(handleComponentMoved()));
+  connect(this, SIGNAL(transformChange()), pConnectorLineAnnotation, SLOT(handleComponentMoved()), Qt::UniqueConnection);
   if (!pConnectorLineAnnotation->isInheritedShape()) {
-    connect(this, SIGNAL(transformHasChanged()), pConnectorLineAnnotation, SLOT(updateConnectionAnnotation()));
+    connect(this, SIGNAL(transformHasChanged()), pConnectorLineAnnotation, SLOT(updateConnectionAnnotation()), Qt::UniqueConnection);
   }
 }
 
@@ -948,6 +948,39 @@ void Component::shapeDeleted()
   showNonExistingOrDefaultComponentIfNeeded();
   if (mpGraphicsView->getViewType() == StringHandler::Icon) {
     mpGraphicsView->getModelWidget()->getLibraryTreeItem()->handleIconUpdated();
+  }
+}
+
+/*!
+ * \brief Component::renameComponentInConnections
+ * Called when OMCProxy::renameComponentInClass() is used. Updates the components name in connections list.\n
+ * So that next OMCProxy::updateConnection() uses the new name. Ticket #3683.
+ * \param newName
+ */
+void Component::renameComponentInConnections(QString newName)
+{
+  if (mpGraphicsView->getViewType() == StringHandler::Icon) {
+    return;
+  }
+  foreach (LineAnnotation *pConnectionLineAnnotation, mpGraphicsView->getConnectionsList()) {
+    // update start component name
+    Component *pStartComponent = pConnectionLineAnnotation->getStartComponent();
+    if (pStartComponent->getRootParentComponent() == this) {
+      QString startComponentName = pConnectionLineAnnotation->getStartComponentName();
+      startComponentName.replace(getName(), newName);
+      pConnectionLineAnnotation->setStartComponentName(startComponentName);
+      pConnectionLineAnnotation->setToolTip(QString("<b>connect</b>(%1, %2)").arg(pConnectionLineAnnotation->getStartComponentName())
+                                            .arg(pConnectionLineAnnotation->getEndComponentName()));
+    }
+    // update end component name
+    Component *pEndComponent = pConnectionLineAnnotation->getEndComponent();
+    if (pEndComponent->getRootParentComponent() == this) {
+      QString endComponentName = pConnectionLineAnnotation->getEndComponentName();
+      endComponentName.replace(getName(), newName);
+      pConnectionLineAnnotation->setEndComponentName(endComponentName);
+      pConnectionLineAnnotation->setToolTip(QString("<b>connect</b>(%1, %2)").arg(pConnectionLineAnnotation->getStartComponentName())
+                                            .arg(pConnectionLineAnnotation->getEndComponentName()));
+    }
   }
 }
 
@@ -1160,10 +1193,10 @@ void Component::createActions()
   mpAttributesAction = new QAction(Helper::attributes, mpGraphicsView);
   mpAttributesAction->setStatusTip(tr("Shows the component attributes"));
   connect(mpAttributesAction, SIGNAL(triggered()), SLOT(showAttributes()));
-  // View Class Action
-  mpViewClassAction = new QAction(QIcon(":/Resources/icons/model.svg"), Helper::viewClass, mpGraphicsView);
-  mpViewClassAction->setStatusTip(Helper::viewClassTip);
-  connect(mpViewClassAction, SIGNAL(triggered()), SLOT(viewClass()));
+  // Open Class Action
+  mpOpenClassAction = new QAction(QIcon(":/Resources/icons/model.svg"), Helper::openClass, mpGraphicsView);
+  mpOpenClassAction->setStatusTip(Helper::openClassTip);
+  connect(mpOpenClassAction, SIGNAL(triggered()), SLOT(openClass()));
   // View Documentation Action
   mpViewDocumentationAction = new QAction(QIcon(":/Resources/icons/info-icon.svg"), Helper::viewDocumentation, mpGraphicsView);
   mpViewDocumentationAction->setStatusTip(Helper::viewDocumentationTip);
@@ -1390,6 +1423,31 @@ QString Component::getParameterDisplayStringFromExtendsParameters(QString parame
     }
   }
   return displayString;
+}
+
+/*!
+ * \brief Component::updateToolTip
+ * Updates the Component's tooltip.
+ */
+void Component::updateToolTip()
+{
+  QString comment = mpComponentInfo->getComment().replace("\\\"", "\"");
+  OMCProxy *pOMCProxy = mpGraphicsView->getModelWidget()->getModelWidgetContainer()->getMainWindow()->getOMCProxy();
+  comment = pOMCProxy->makeDocumentationUriToFileName(comment);
+  // since tooltips can't handle file:// scheme so we have to remove it in order to display images and make links work.
+#ifdef WIN32
+  comment.replace("src=\"file:///", "src=\"");
+#else
+  comment.replace("src=\"file://", "src=\"");
+#endif
+
+  if (mIsInheritedComponent || mComponentType == Component::Port) {
+    setToolTip(tr("<b>%1</b> %2<br/>%3<br /><br />Component declared in %4").arg(mpComponentInfo->getClassName())
+               .arg(mpComponentInfo->getName()).arg(comment)
+               .arg(mpReferenceComponent->getGraphicsView()->getModelWidget()->getLibraryTreeItem()->getNameStructure()));
+  } else {
+    setToolTip(tr("<b>%1</b> %2<br/>%3").arg(mpComponentInfo->getClassName()).arg(mpComponentInfo->getName()).arg(comment));
+  }
 }
 
 void Component::updatePlacementAnnotation()
@@ -1657,18 +1715,22 @@ void Component::resizedComponent()
 }
 
 /*!
+ * \brief Component::componentCommentHasChanged
+ * Updates the Component's tooltip when the component comment has changed.
+ */
+void Component::componentCommentHasChanged()
+{
+  updateToolTip();
+  update();
+}
+
+/*!
  * \brief Component::componentNameHasChanged
  * Updates the Component's tooltip when the component name has changed. Emits displayTextChanged signal.
  */
 void Component::componentNameHasChanged()
 {
-  if (mIsInheritedComponent || mComponentType == Component::Port) {
-    setToolTip(tr("<b>%1</b> %2<br /><br />Component declared in %3").arg(mpComponentInfo->getClassName())
-               .arg(mpComponentInfo->getName())
-               .arg(mpReferenceComponent->getGraphicsView()->getModelWidget()->getLibraryTreeItem()->getNameStructure()));
-  } else {
-    setToolTip(tr("<b>%1</b> %2").arg(mpComponentInfo->getClassName()).arg(mpComponentInfo->getName()));
-  }
+  updateToolTip();
   displayTextChangedRecursive();
   update();
 }
@@ -2011,8 +2073,11 @@ void Component::showAttributes()
   pComponentAttributes->exec();
 }
 
-//! Slot that opens up the component Modelica class in a new tab/window.
-void Component::viewClass()
+/*!
+ * \brief Component::openClass
+ * Slot that opens up the component Modelica class in a new tab/window.
+ */
+void Component::openClass()
 {
   MainWindow *pMainWindow = mpGraphicsView->getModelWidget()->getModelWidgetContainer()->getMainWindow();
   pMainWindow->getLibraryWidget()->openLibraryTreeItem(mpLibraryTreeItem->getNameStructure());
@@ -2022,7 +2087,7 @@ void Component::viewClass()
 void Component::viewDocumentation()
 {
   MainWindow *pMainWindow = mpGraphicsView->getModelWidget()->getModelWidgetContainer()->getMainWindow();
-  pMainWindow->getDocumentationWidget()->showDocumentation(mpLibraryTreeItem->getNameStructure());
+  pMainWindow->getDocumentationWidget()->showDocumentation(mpLibraryTreeItem);
   pMainWindow->getDocumentationDockWidget()->show();
 }
 
@@ -2079,7 +2144,7 @@ void Component::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
   menu.addAction(pComponent->getParametersAction());
   menu.addAction(pComponent->getAttributesAction());
   menu.addSeparator();
-  menu.addAction(pComponent->getViewClassAction());
+  menu.addAction(pComponent->getOpenClassAction());
   menu.addAction(pComponent->getViewDocumentationAction());
   menu.addSeparator();
   LibraryTreeItem *pLibraryTreeItem = mpGraphicsView->getModelWidget()->getLibraryTreeItem();
@@ -2091,7 +2156,7 @@ void Component::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
         menu.addAction(pComponent->getParametersAction());
         menu.addAction(pComponent->getAttributesAction());
         menu.addSeparator();
-        menu.addAction(pComponent->getViewClassAction());
+        menu.addAction(pComponent->getOpenClassAction());
         menu.addAction(pComponent->getViewDocumentationAction());
         menu.addSeparator();
         if (pComponent->isInheritedComponent()) {
@@ -2137,6 +2202,8 @@ QVariant Component::itemChange(GraphicsItemChange change, const QVariant &value)
         connect(mpGraphicsView, SIGNAL(keyPressDuplicate()), this, SLOT(duplicate()), Qt::UniqueConnection);
         connect(mpGraphicsView, SIGNAL(keyPressRotateClockwise()), this, SLOT(rotateClockwise()), Qt::UniqueConnection);
         connect(mpGraphicsView, SIGNAL(keyPressRotateAntiClockwise()), this, SLOT(rotateAntiClockwise()), Qt::UniqueConnection);
+        connect(mpGraphicsView, SIGNAL(keyPressFlipHorizontal()), this, SLOT(flipHorizontal()), Qt::UniqueConnection);
+        connect(mpGraphicsView, SIGNAL(keyPressFlipVertical()), this, SLOT(flipVertical()), Qt::UniqueConnection);
         connect(mpGraphicsView, SIGNAL(keyPressUp()), this, SLOT(moveUp()), Qt::UniqueConnection);
         connect(mpGraphicsView, SIGNAL(keyPressShiftUp()), this, SLOT(moveShiftUp()), Qt::UniqueConnection);
         connect(mpGraphicsView, SIGNAL(keyPressCtrlUp()), this, SLOT(moveCtrlUp()), Qt::UniqueConnection);
@@ -2172,6 +2239,8 @@ QVariant Component::itemChange(GraphicsItemChange change, const QVariant &value)
         disconnect(mpGraphicsView, SIGNAL(keyPressDuplicate()), this, SLOT(duplicate()));
         disconnect(mpGraphicsView, SIGNAL(keyPressRotateClockwise()), this, SLOT(rotateClockwise()));
         disconnect(mpGraphicsView, SIGNAL(keyPressRotateAntiClockwise()), this, SLOT(rotateAntiClockwise()));
+        disconnect(mpGraphicsView, SIGNAL(keyPressFlipHorizontal()), this, SLOT(flipHorizontal()));
+        disconnect(mpGraphicsView, SIGNAL(keyPressFlipVertical()), this, SLOT(flipVertical()));
         disconnect(mpGraphicsView, SIGNAL(keyPressUp()), this, SLOT(moveUp()));
         disconnect(mpGraphicsView, SIGNAL(keyPressShiftUp()), this, SLOT(moveShiftUp()));
         disconnect(mpGraphicsView, SIGNAL(keyPressCtrlUp()), this, SLOT(moveCtrlUp()));

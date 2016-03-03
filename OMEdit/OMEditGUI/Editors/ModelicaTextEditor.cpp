@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 #include "BreakpointMarker.h"
@@ -155,7 +154,7 @@ QStringList ModelicaTextEditor::getClassNames(QString *errorString)
     if (!modelicaText.startsWith("within")) {
       stringToParse = QString("within %1;%2").arg(pLibraryTreeItem->parent()->getNameStructure()).arg(modelicaText);
     }
-    classNames = pOMCProxy->parseString(stringToParse, pLibraryTreeItem->getNameStructure());
+    classNames = pOMCProxy->parseString(stringToParse, pLibraryTreeItem->getFileName());
   }
   // if user is defining multiple top level classes.
   if (classNames.size() > 1) {
@@ -186,13 +185,14 @@ QStringList ModelicaTextEditor::getClassNames(QString *errorString)
 /*!
  * \brief ModelicaTextEditor::validateText
  * When user make some changes in the ModelicaTextEditor text then this method validates the text and show text correct options.
+ * \param pLibraryTreeItem
  * \return
  */
-bool ModelicaTextEditor::validateText()
+bool ModelicaTextEditor::validateText(LibraryTreeItem **pLibraryTreeItem)
 {
   if (mTextChanged) {
     // if the user makes few mistakes in the text then dont let him change the perspective
-    if (!mpModelWidget->modelicaEditorTextChanged()) {
+    if (!mpModelWidget->modelicaEditorTextChanged(pLibraryTreeItem)) {
       QMessageBox *pMessageBox = new QMessageBox(mpMainWindow);
       pMessageBox->setWindowTitle(QString(Helper::applicationName).append(" - ").append(Helper::error));
       pMessageBox->setIcon(QMessageBox::Critical);
@@ -223,6 +223,85 @@ bool ModelicaTextEditor::validateText()
 }
 
 /*!
+ * \brief ModelicaTextEditor::removeLeadingSpaces
+ * Removes the leading spaces from a nested class text to make it more readable.
+ * \param contents
+ * \return
+ */
+QString ModelicaTextEditor::removeLeadingSpaces(QString contents)
+{
+  QString text;
+  int startLeadingSpaces = 0;
+  int leadingSpaces = 0;
+  QTextStream textStream(&contents);
+  int lineNumber = 1;
+  while (!textStream.atEnd()) {
+    QString currentLine = textStream.readLine();
+    if (lineNumber == 1) {  // the first line
+      startLeadingSpaces = StringHandler::getLeadingSpacesSize(currentLine);
+      leadingSpaces = startLeadingSpaces;
+    } else {
+      leadingSpaces = qMin(startLeadingSpaces, StringHandler::getLeadingSpacesSize(currentLine));
+    }
+    text += currentLine.mid(leadingSpaces) + "\n";
+    lineNumber++;
+  }
+  return text;
+}
+
+/*!
+ * \brief ModelicaTextEditor::storeLeadingSpaces
+ * Stores the leading spaces information in the text block user data.
+ * \param leadingSpacesMap
+ */
+void ModelicaTextEditor::storeLeadingSpaces(QMap<int, int> leadingSpacesMap)
+{
+  QTextBlock block = mpPlainTextEdit->document()->firstBlock();
+  while (block.isValid()) {
+    TextBlockUserData *pTextBlockUserData = BaseEditorDocumentLayout::userData(block);
+    if (pTextBlockUserData) {
+      pTextBlockUserData->setLeadingSpaces(leadingSpacesMap.value(block.blockNumber() + 1, 0));
+    }
+    block = block.next();
+  }
+}
+
+/*!
+ * \brief ModelicaTextEditor::getPlainText
+ * Reads the leading spaces information from the text block user data and inserts them to the actual string.
+ * \return
+ */
+QString ModelicaTextEditor::getPlainText()
+{
+  if (mpModelWidget->getLibraryTreeItem()->isInPackageOneFile()) {
+    QString text;
+    QTextBlock block = mpPlainTextEdit->document()->firstBlock();
+    while (block.isValid()) {
+      TextBlockUserData *pTextBlockUserData = BaseEditorDocumentLayout::userData(block);
+      if (pTextBlockUserData) {
+        if (pTextBlockUserData->getLeadingSpaces() == -1) {
+          TextBlockUserData *pFirstBlockUserData = BaseEditorDocumentLayout::userData(mpPlainTextEdit->document()->firstBlock());
+          if (pFirstBlockUserData) {
+            pTextBlockUserData->setLeadingSpaces(pFirstBlockUserData->getLeadingSpaces());
+          } else {
+            pTextBlockUserData->setLeadingSpaces(0);
+          }
+        }
+        text += QString(pTextBlockUserData->getLeadingSpaces(), ' ');
+      }
+      text += block.text();
+      block = block.next();
+      if (block.isValid()) { // not last block
+        text += "\n";
+      }
+    }
+    return text;
+  } else {
+    return mpPlainTextEdit->toPlainText();
+  }
+}
+
+/*!
  * \brief ModelicaTextEditor::showContextMenu
  * Create a context menu.
  * \param point
@@ -236,16 +315,32 @@ void ModelicaTextEditor::showContextMenu(QPoint point)
   delete pMenu;
 }
 
-//! Reimplementation of QPlainTextEdit::setPlainText method.
-//! Makes sure we dont update if the passed text is same.
-//! @param text the string to set.
+/*!
+ * \brief ModelicaTextEditor::setPlainText
+ * Reimplementation of QPlainTextEdit::setPlainText method.
+ * Makes sure we dont update if the passed text is same.
+ * \param text the string to set.
+ */
 void ModelicaTextEditor::setPlainText(const QString &text)
 {
-  if (text != mpPlainTextEdit->toPlainText()) {
+  QMap<int, int> leadingSpacesMap;
+  QString contents = text;
+  // store and remove leading spaces
+  if (mpModelWidget->getLibraryTreeItem()->isInPackageOneFile()) {
+    leadingSpacesMap = StringHandler::getLeadingSpaces(contents);
+    contents = removeLeadingSpaces(contents);
+  }
+  // Only set the text when it is really new
+  if (contents != mpPlainTextEdit->toPlainText()) {
     mForceSetPlainText = true;
-    mpPlainTextEdit->setPlainText(text);
+    if (mpModelWidget->getLibraryTreeItem()->isInPackageOneFile()) {
+      mpPlainTextEdit->setPlainText(contents);
+      storeLeadingSpaces(leadingSpacesMap);
+    } else {
+      mpPlainTextEdit->setPlainText(contents);
+    }
     mForceSetPlainText = false;
-    mLastValidText = text;
+    mLastValidText = contents;
   }
 }
 

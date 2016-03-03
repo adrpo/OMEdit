@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -44,6 +43,9 @@
 #include "SimulationOutputWidget.h"
 #include "FetchInterfaceDataDialog.h"
 #include "TLMCoSimulationOutputWidget.h"
+#ifdef WIN32
+#include "version.h"
+#endif
 
 MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent)
   : QMainWindow(parent), mDebug(debug), mExitApplicationStatus(false)
@@ -240,10 +242,14 @@ MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent
   // set the index reduction methods.
   mpOMCProxy->setIndexReductionMethod(mpOptionsDialog->getSimulationPage()->getIndexReductionMethodComboBox()->currentText());
   // set the OMC Flags.
-  if (!mpOptionsDialog->getSimulationPage()->getOMCFlagsTextBox()->text().isEmpty())
+  if (!mpOptionsDialog->getSimulationPage()->getOMCFlagsTextBox()->text().isEmpty()) {
     mpOMCProxy->setCommandLineOptions(mpOptionsDialog->getSimulationPage()->getOMCFlagsTextBox()->text());
-  if (mpOptionsDialog->getDebuggerPage()->getGenerateOperationsCheckBox()->isChecked())
+  }
+  if (mpOptionsDialog->getDebuggerPage()->getGenerateOperationsCheckBox()->isChecked()) {
     mpOMCProxy->setCommandLineOptions("+d=infoXmlOperations");
+  }
+  mpOMCProxy->setCommandLineOptions(QString("+simCodeTarget=%1").arg(mpOptionsDialog->getSimulationPage()->getTargetLanguageComboBox()->currentText()));
+  mpOMCProxy->setCommandLineOptions(QString("+target=%1").arg(mpOptionsDialog->getSimulationPage()->getTargetCompilerComboBox()->currentText()));
   // restore OMEdit widgets state
   QSettings *pSettings = OpenModelica::getApplicationSettings();
   if (mpOptionsDialog->getGeneralSettingsPage()->getPreserveUserCustomizations())
@@ -709,7 +715,7 @@ void MainWindow::simulate(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -720,7 +726,7 @@ void MainWindow::simulateWithTransformationalDebugger(LibraryTreeItem *pLibraryT
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -731,7 +737,7 @@ void MainWindow::simulateWithAlgorithmicDebugger(LibraryTreeItem *pLibraryTreeIt
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -742,7 +748,7 @@ void MainWindow::simulationSetup(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -753,7 +759,7 @@ void MainWindow::instantiateModel(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -768,7 +774,10 @@ void MainWindow::instantiateModel(LibraryTreeItem *pLibraryTreeItem)
   }
   QString instantiateModelResult = mpOMCProxy->instantiateModel(pLibraryTreeItem->getNameStructure());
   if (!instantiateModelResult.isEmpty()) {
-    QString windowTitle = QString(Helper::instantiateModel).append(" - ").append(pLibraryTreeItem->getName());
+    mpMessagesWidget->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0,
+                                                tr("Instantiation of %1 completed successfully.").arg(pLibraryTreeItem->getNameStructure()),
+                                                Helper::scriptingKind, Helper::notificationLevel));
+    QString windowTitle = QString(Helper::instantiateModel).append(" - ").append(pLibraryTreeItem->getNameStructure());
     InformationDialog *pInformationDialog = new InformationDialog(windowTitle, instantiateModelResult, true, this);
     pInformationDialog->show();
   }
@@ -782,7 +791,7 @@ void MainWindow::checkModel(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -797,7 +806,10 @@ void MainWindow::checkModel(LibraryTreeItem *pLibraryTreeItem)
   }
   QString checkModelResult = mpOMCProxy->checkModel(pLibraryTreeItem->getNameStructure());
   if (!checkModelResult.isEmpty()) {
-    QString windowTitle = QString(Helper::checkModel).append(" - ").append(pLibraryTreeItem->getName());
+    mpMessagesWidget->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0,
+                                                tr("Check of %1 completed successfully.").arg(pLibraryTreeItem->getNameStructure()),
+                                                Helper::scriptingKind, Helper::notificationLevel));
+    QString windowTitle = QString(Helper::checkModel).append(" - ").append(pLibraryTreeItem->getNameStructure());
     InformationDialog *pInformationDialog = new InformationDialog(windowTitle, checkModelResult, false, this);
     pInformationDialog->show();
   }
@@ -811,7 +823,7 @@ void MainWindow::checkAllModels(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -835,7 +847,7 @@ void MainWindow::exportModelFMU(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -863,7 +875,7 @@ void MainWindow::exportModelXML(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -887,7 +899,7 @@ void MainWindow::exportModelFigaro(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -985,7 +997,7 @@ void MainWindow::exportModelToOMNotebook(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    if (!pLibraryTreeItem->getModelWidget()->validateText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }
@@ -1765,6 +1777,23 @@ void MainWindow::exportModelFigaro()
   } else {
     mpMessagesWidget->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0, GUIMessages::getMessage(GUIMessages::NO_MODELICA_CLASS_OPEN)
                                                 .arg(tr("exporting to Figaro")), Helper::scriptingKind, Helper::notificationLevel));
+  }
+}
+
+/*!
+ * \brief MainWindow::showOpenModelicaCommandPrompt
+ * Opens the command prompt to compile OpenModelica generated code with MinGW and run it.
+ */
+void MainWindow::showOpenModelicaCommandPrompt()
+{
+  QString commandPrompt = "cmd.exe";
+  QString promptBatch = QString("%1/share/omc/scripts/Prompt.bat").arg(Helper::OpenModelicaHome);
+  QStringList args;
+  args << "/K" << promptBatch;
+  if (!QProcess::startDetached(commandPrompt, args, mpOptionsDialog->getGeneralSettingsPage()->getWorkingDirectory())) {
+    QString errorString = tr("Unable to run command <b>%1</b> with arguments <b>%2</b>.").arg(commandPrompt).arg(args.join(" "));
+    mpMessagesWidget->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0, errorString, Helper::scriptingKind,
+                                                Helper::errorLevel));
   }
 }
 
@@ -2583,8 +2612,12 @@ void MainWindow::createActions()
   mpShowOMCLoggerWidgetAction = new QAction(QIcon(":/Resources/icons/console.svg"), Helper::OpenModelicaCompilerCLI, this);
   mpShowOMCLoggerWidgetAction->setStatusTip(tr("Shows OpenModelica Compiler CLI"));
   connect(mpShowOMCLoggerWidgetAction, SIGNAL(triggered()), mpOMCProxy, SLOT(openOMCLoggerWidget()));
+  // show OpenModelica command prompt action
+  mpShowOpenModelicaCommandPromptAction = new QAction(QIcon(":/Resources/icons/console.svg"), tr("OpenModelica Command Prompt"), this);
+  mpShowOpenModelicaCommandPromptAction->setStatusTip(tr("Shows OpenModelica Compiler CLI"));
+  connect(mpShowOpenModelicaCommandPromptAction, SIGNAL(triggered()), SLOT(showOpenModelicaCommandPrompt()));
+  // show OMC Diff widget action
   if (isDebug()) {
-    // show OMC Diff widget action
     mpShowOMCDiffWidgetAction = new QAction(QIcon(":/Resources/icons/console.svg"), tr("OpenModelica Compiler Diff"), this);
     mpShowOMCDiffWidgetAction->setStatusTip(tr("Shows OpenModelica Compiler Diff"));
     connect(mpShowOMCDiffWidgetAction, SIGNAL(triggered()), mpOMCProxy, SLOT(openOMCDiffWidget()));
@@ -2878,6 +2911,9 @@ void MainWindow::createMenus()
   pToolsMenu->setTitle(tr("&Tools"));
   // add actions to Tools menu
   pToolsMenu->addAction(mpShowOMCLoggerWidgetAction);
+#ifdef Q_OS_WIN
+  pToolsMenu->addAction(mpShowOpenModelicaCommandPromptAction);
+#endif
   if (isDebug()) {
     pToolsMenu->addAction(mpShowOMCDiffWidgetAction);
   }
@@ -3260,16 +3296,22 @@ AboutOMEditWidget::AboutOMEditWidget(MainWindow *pMainWindow)
   // OMEdit intro text
   Label *pIntroLabel = new Label(Helper::applicationIntroText);
   pIntroLabel->setFont(QFont(Helper::systemFontInfo.family(), Helper::systemFontInfo.pointSize() + 3 + MAC_FONT_FACTOR));
+#ifdef WIN32
+  Label *pOMEditVersionLabel = new Label(GIT_SHA);
+#else
+  Label *pOMEditVersionLabel = new Label;
+#endif
+  pOMEditVersionLabel->setFont(QFont(Helper::systemFontInfo.family(), Helper::systemFontInfo.pointSize() - 3 + MAC_FONT_FACTOR));
   // OpenModelica compiler info
-  Label *pConnectedLabel = new Label(QString("Connected to OpenModelica ").append(Helper::OpenModelicaVersion));
-  pConnectedLabel->setFont(QFont(Helper::systemFontInfo.family(), Helper::systemFontInfo.pointSize() - 2 + MAC_FONT_FACTOR));
+  Label *pConnectedLabel = new Label(QString("Connected to ").append(Helper::OpenModelicaVersion));
+  pConnectedLabel->setFont(QFont(Helper::systemFontInfo.family(), Helper::systemFontInfo.pointSize() - 3 + MAC_FONT_FACTOR));
   // about text
   QString aboutText = QString("Copyright <b>Open Source Modelica Consortium (OSMC)</b>.<br />")
       .append("Distributed under OSMC-PL and GPL, see <u><a href=\"http://www.openmodelica.org\">www.openmodelica.org</a></u>.<br /><br />")
       .append("Initially developed by <b>Adeel Asghar</b> and <b>Sonia Tariq</b> as part of their final master thesis.");
   Label *pAboutTextLabel = new Label;
   pAboutTextLabel->setTextFormat(Qt::RichText);
-  pAboutTextLabel->setTextInteractionFlags(pAboutTextLabel->textInteractionFlags() |Qt::LinksAccessibleByMouse | Qt::LinksAccessibleByKeyboard);
+  pAboutTextLabel->setTextInteractionFlags(pAboutTextLabel->textInteractionFlags() | Qt::LinksAccessibleByMouse | Qt::LinksAccessibleByKeyboard);
   pAboutTextLabel->setOpenExternalLinks(true);
   pAboutTextLabel->setFont(QFont(Helper::systemFontInfo.family(), Helper::systemFontInfo.pointSize() - 4 + MAC_FONT_FACTOR));
   pAboutTextLabel->setWordWrap(true);
@@ -3313,11 +3355,12 @@ AboutOMEditWidget::AboutOMEditWidget(MainWindow *pMainWindow)
   pMainLayout->setContentsMargins(45, 200, 45, 20);
   pMainLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
   pMainLayout->addWidget(pIntroLabel, 1, 0, 1, 1, Qt::AlignHCenter);
-  pMainLayout->addWidget(pConnectedLabel, 2, 0, 1, 1, Qt::AlignHCenter);
-  pMainLayout->addLayout(pAboutLayout, 3, 0, 1, 1);
-  pMainLayout->addWidget(pContributorsHeading, 4, 0, 1, 1);
-  pMainLayout->addWidget(pScrollArea, 5, 0, 1, 1);
-  pMainLayout->addWidget(pCloseButton, 6, 0, 1, 1, Qt::AlignRight);
+  pMainLayout->addWidget(pOMEditVersionLabel, 2, 0, 1, 1, Qt::AlignHCenter);
+  pMainLayout->addWidget(pConnectedLabel, 3, 0, 1, 1, Qt::AlignHCenter);
+  pMainLayout->addLayout(pAboutLayout, 4, 0, 1, 1);
+  pMainLayout->addWidget(pContributorsHeading, 5, 0, 1, 1);
+  pMainLayout->addWidget(pScrollArea, 6, 0, 1, 1);
+  pMainLayout->addWidget(pCloseButton, 7, 0, 1, 1, Qt::AlignRight);
   setLayout(pMainLayout);
 }
 

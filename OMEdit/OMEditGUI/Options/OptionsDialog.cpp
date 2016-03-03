@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -222,6 +221,9 @@ void OptionsDialog::readModelicaTextSettings()
   }
   if (mpSettings->contains("textEditor/indentSize")) {
     mpModelicaTextEditorPage->getIndentSpinBox()->setValue(mpSettings->value("textEditor/indentSize").toInt());
+  }
+  if (mpSettings->contains("textEditor/preserveTextIndentation")) {
+    mpModelicaTextEditorPage->getPreserveTextIndentationCheckBox()->setChecked(mpSettings->value("textEditor/preserveTextIndentation").toBool());
   }
   if (mpSettings->contains("textEditor/enableSyntaxHighlighting")) {
     mpModelicaTextEditorPage->getSyntaxHighlightingCheckbox()->setChecked(mpSettings->value("textEditor/enableSyntaxHighlighting").toBool());
@@ -703,6 +705,7 @@ void OptionsDialog::saveModelicaTextSettings()
   mpSettings->setValue("textEditor/tabPolicy", mpModelicaTextEditorPage->getTabPolicyComboBox()->itemData(mpModelicaTextEditorPage->getTabPolicyComboBox()->currentIndex()).toInt());
   mpSettings->setValue("textEditor/tabSize", mpModelicaTextEditorPage->getTabSizeSpinBox()->value());
   mpSettings->setValue("textEditor/indentSize", mpModelicaTextEditorPage->getIndentSpinBox()->value());
+  mpSettings->setValue("textEditor/preserveTextIndentation", mpModelicaTextEditorPage->getPreserveTextIndentationCheckBox()->isChecked());
   mpSettings->setValue("textEditor/enableSyntaxHighlighting", mpModelicaTextEditorPage->getSyntaxHighlightingCheckbox()->isChecked());
   mpSettings->setValue("textEditor/matchParenthesesCommentsQuotes", mpModelicaTextEditorPage->getMatchParenthesesCommentsQuotesCheckBox()->isChecked());
   mpSettings->setValue("textEditor/enableLineWrapping", mpModelicaTextEditorPage->getLineWrappingCheckbox()->isChecked());
@@ -1920,6 +1923,9 @@ ModelicaTextEditorPage::ModelicaTextEditorPage(OptionsDialog *pOptionsDialog)
   mpIndentSpinBox = new QSpinBox;
   mpIndentSpinBox->setRange(1, 20);
   mpIndentSpinBox->setValue(2);
+  // preserve text indentation
+  mpPreserveTextIndentationCheckBox = new QCheckBox(tr("Preserve Text Indentation"));
+  mpPreserveTextIndentationCheckBox->setChecked(true);
   // set tabs & indentation groupbox layout
   QGridLayout *pTabsAndIndentationGroupBoxLayout = new QGridLayout;
   pTabsAndIndentationGroupBoxLayout->addWidget(mpTabPolicyLabel, 0, 0);
@@ -1928,6 +1934,7 @@ ModelicaTextEditorPage::ModelicaTextEditorPage(OptionsDialog *pOptionsDialog)
   pTabsAndIndentationGroupBoxLayout->addWidget(mpTabSizeSpinBox, 1, 1);
   pTabsAndIndentationGroupBoxLayout->addWidget(mpIndentSizeLabel, 2, 0);
   pTabsAndIndentationGroupBoxLayout->addWidget(mpIndentSpinBox, 2, 1);
+  pTabsAndIndentationGroupBoxLayout->addWidget(mpPreserveTextIndentationCheckBox, 3, 0, 1, 2);
   mpTabsAndIndentation->setLayout(pTabsAndIndentationGroupBoxLayout);
   // syntax highlight and text wrapping groupbox
   mpSyntaxHighlightAndTextWrappingGroupBox = new QGroupBox(tr("Syntax Highlight and Text Wrapping"));
@@ -2546,26 +2553,26 @@ SimulationPage::SimulationPage(OptionsDialog *pOptionsDialog)
   // Matching Algorithm
   mpSimulationGroupBox = new QGroupBox(Helper::simulation);
   mpMatchingAlgorithmLabel = new Label(tr("Matching Algorithm:"));
-  QStringList matchingAlgorithmChoices, matchingAlgorithmComments;
-  mpOptionsDialog->getMainWindow()->getOMCProxy()->getAvailableMatchingAlgorithms(&matchingAlgorithmChoices, &matchingAlgorithmComments);
+  OMCInterface::getAvailableMatchingAlgorithms_res matchingAlgorithms;
+  matchingAlgorithms = mpOptionsDialog->getMainWindow()->getOMCProxy()->getAvailableMatchingAlgorithms();
   mpMatchingAlgorithmComboBox = new QComboBox;
   int i = 0;
-  foreach (QString matchingAlgorithmChoice, matchingAlgorithmChoices) {
+  foreach (QString matchingAlgorithmChoice, matchingAlgorithms.allChoices) {
     mpMatchingAlgorithmComboBox->addItem(matchingAlgorithmChoice);
-    mpMatchingAlgorithmComboBox->setItemData(i, matchingAlgorithmComments[i], Qt::ToolTipRole);
+    mpMatchingAlgorithmComboBox->setItemData(i, matchingAlgorithms.allComments[i], Qt::ToolTipRole);
     i++;
   }
   connect(mpMatchingAlgorithmComboBox, SIGNAL(currentIndexChanged(int)), SLOT(updateMatchingAlgorithmToolTip(int)));
   mpMatchingAlgorithmComboBox->setCurrentIndex(mpMatchingAlgorithmComboBox->findText(mpOptionsDialog->getMainWindow()->getOMCProxy()->getMatchingAlgorithm()));
   // Index Reduction Method
   mpIndexReductionMethodLabel = new Label(tr("Index Reduction Method:"));
-  QStringList indexReductionMethodChoices, indexReductionMethodComments;
-  mpOptionsDialog->getMainWindow()->getOMCProxy()->getAvailableIndexReductionMethods(&indexReductionMethodChoices, &indexReductionMethodComments);
+  OMCInterface::getAvailableIndexReductionMethods_res indexReductionMethods;
+  indexReductionMethods = mpOptionsDialog->getMainWindow()->getOMCProxy()->getAvailableIndexReductionMethods();
   mpIndexReductionMethodComboBox = new QComboBox;
   i = 0;
-  foreach (QString indexReductionChoice, indexReductionMethodChoices) {
+  foreach (QString indexReductionChoice, indexReductionMethods.allChoices) {
     mpIndexReductionMethodComboBox->addItem(indexReductionChoice);
-    mpIndexReductionMethodComboBox->setItemData(i, indexReductionMethodComments[i], Qt::ToolTipRole);
+    mpIndexReductionMethodComboBox->setItemData(i, indexReductionMethods.allComments[i], Qt::ToolTipRole);
     i++;
   }
   connect(mpIndexReductionMethodComboBox, SIGNAL(currentIndexChanged(int)), SLOT(updateIndexReductionToolTip(int)));
@@ -2581,6 +2588,7 @@ SimulationPage::SimulationPage(OptionsDialog *pOptionsDialog)
     mpTargetLanguageComboBox->setItemData(i, description, Qt::ToolTipRole);
     i++;
   }
+  mpTargetLanguageComboBox->setCurrentIndex(mpTargetLanguageComboBox->findText("C"));
   // Compiler
   mpCompilerLabel = new Label(tr("Target Compiler:"));
   OMCInterface::getConfigFlagValidOptions_res target = mpOptionsDialog->getMainWindow()->getOMCProxy()->getConfigFlagValidOptions("target");

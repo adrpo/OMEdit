@@ -32,7 +32,6 @@
  *
  * @author Adeel Asghar <adeel.asghar@liu.se>
  *
- * RCS: $Id$
  *
  */
 
@@ -358,8 +357,8 @@ void ModelicaClassDialog::createModelicaClass()
   // show the ModelWidget
   pLibraryTreeModel->showModelWidget(pLibraryTreeItem, "", true);
   if (pLibraryTreeItem->getModelWidget()) {
-    pLibraryTreeItem->getModelWidget()->getIconGraphicsView()->addClassAnnotation();
-    pLibraryTreeItem->getModelWidget()->getDiagramGraphicsView()->addClassAnnotation();
+    pLibraryTreeItem->getModelWidget()->getIconGraphicsView()->addClassAnnotation(false);
+    pLibraryTreeItem->getModelWidget()->getDiagramGraphicsView()->addClassAnnotation(false);
     pLibraryTreeItem->getModelWidget()->updateModelicaText();
   }
   accept();
@@ -723,22 +722,24 @@ void SaveAsClassDialog::showHideSaveContentsInOneFileCheckBox(QString text)
 }
 
 /*!
-  \class CopyClassDialog
-  \brief Creates a dialog to allow users to copy the Modelica class.
-  */
-
+ * \class DuplicateClassDialog
+ * \brief Creates a dialog to allow users to duplicate/save as the Modelica class.
+ */
 /*!
-  \param name - name of Modelica class
-  \param nameStructure - qualified name of Modelica class
-  \param pParent - pointer to MainWindow
-  */
-DuplicateClassDialog::DuplicateClassDialog(LibraryTreeItem *pLibraryTreeItem, MainWindow *pMainWindow)
+ * \brief DuplicateClassDialog::DuplicateClassDialog
+ * \param saveAs
+ * \param pLibraryTreeItem
+ * \param pMainWindow
+ */
+DuplicateClassDialog::DuplicateClassDialog(bool saveAs, LibraryTreeItem *pLibraryTreeItem, MainWindow *pMainWindow)
   : QDialog(pMainWindow, Qt::WindowTitleHint), mpLibraryTreeItem(pLibraryTreeItem), mpMainWindow(pMainWindow)
 {
   setAttribute(Qt::WA_DeleteOnClose);
-  setWindowTitle(QString("%1 - %2 %3").arg(Helper::applicationName).arg(Helper::duplicate).arg(mpLibraryTreeItem->getNameStructure()));
+  mSaveAs = saveAs;
+  QString heading = mSaveAs ? Helper::saveAs : Helper::duplicate;
+  setWindowTitle(QString("%1 - %2 %3").arg(Helper::applicationName).arg(heading).arg(mpLibraryTreeItem->getNameStructure()));
   mpNameLabel = new Label(Helper::name);
-  mpNameTextBox = new QLineEdit;
+  mpNameTextBox = new QLineEdit(mpLibraryTreeItem->getName());
   mpPathLabel = new Label(Helper::path);
   mpPathTextBox = new QLineEdit;
   mpPathBrowseButton = new QPushButton(Helper::browse);
@@ -785,10 +786,13 @@ void DuplicateClassDialog::duplicateClass()
     return;
   }
   /* if path class doesn't exist. */
+  LibraryTreeModel *pLibraryTreeModel = mpMainWindow->getLibraryWidget()->getLibraryTreeModel();
+  LibraryTreeItem *pParentLibraryTreeItem = pLibraryTreeModel->getRootLibraryTreeItem();
   if (!mpPathTextBox->text().isEmpty()) {
-    if (!mpMainWindow->getOMCProxy()->existClass(mpPathTextBox->text())) {
-      QMessageBox::critical(this, QString(Helper::applicationName).append(" - ").append(Helper::error), GUIMessages::getMessage(
-                              GUIMessages::INSERT_IN_CLASS_NOT_FOUND).arg(mpPathTextBox->text()), Helper::ok);
+    pParentLibraryTreeItem = pLibraryTreeModel->findLibraryTreeItem(mpPathTextBox->text());
+    if (!pParentLibraryTreeItem) {
+      QMessageBox::critical(this, QString(Helper::applicationName).append(" - ").append(Helper::error),
+                            GUIMessages::getMessage(GUIMessages::INSERT_IN_CLASS_NOT_FOUND).arg(mpPathTextBox->text()), Helper::ok);
       return;
     }
   }
@@ -802,17 +806,14 @@ void DuplicateClassDialog::duplicateClass()
   }
   // if everything is fine then duplicate the class.
   if (mpMainWindow->getOMCProxy()->copyClass(mpLibraryTreeItem->getNameStructure(), mpNameTextBox->text(), mpPathTextBox->text())) {
-    LibraryTreeModel *pLibraryTreeModel = mpMainWindow->getLibraryWidget()->getLibraryTreeModel();
     LibraryTreeItem *pLibraryTreeItem;
-    QString className = mpNameTextBox->text().trimmed();
-    LibraryTreeItem *pParentLibraryTreeItem = pLibraryTreeModel->findLibraryTreeItem(mpPathTextBox->text().trimmed());
-    if (pParentLibraryTreeItem) {
-      pLibraryTreeItem = pLibraryTreeModel->createLibraryTreeItem(className, pParentLibraryTreeItem, false, false, true);
-    } else {
-      pLibraryTreeItem = pLibraryTreeModel->createLibraryTreeItem(className, pLibraryTreeModel->getRootLibraryTreeItem(), false, false, true);
-    }
+    pLibraryTreeItem = pLibraryTreeModel->createLibraryTreeItem(mpNameTextBox->text().trimmed(), pParentLibraryTreeItem, false, false, true);
     pLibraryTreeItem->setSaveContentsType(mpLibraryTreeItem->getSaveContentsType());
     pLibraryTreeModel->checkIfAnyNonExistingClassLoaded();
+    pLibraryTreeModel->updateLibraryTreeItemClassText(pLibraryTreeItem);
+    if (mSaveAs) {
+      mpMainWindow->getLibraryWidget()->saveLibraryTreeItem(pLibraryTreeItem);
+    }
   }
   accept();
 }
