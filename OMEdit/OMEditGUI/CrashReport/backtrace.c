@@ -172,16 +172,20 @@ _backtrace(struct output_buffer *ob, struct bfd_set *set, int depth , LPCONTEXT 
 
   STACKFRAME frame;
   memset(&frame,0,sizeof(frame));
-#if defined(__MINGW32__) && (GCC_VERSION > 40900)
-  /* adrpo: this doesn't seem to be working for MinGW GCC 4.9.2 */
-#else
-  frame.AddrPC.Offset = context->Eip;
-  frame.AddrPC.Mode = AddrModeFlat;
-  frame.AddrStack.Offset = context->Esp;
-  frame.AddrStack.Mode = AddrModeFlat;
-  frame.AddrFrame.Offset = context->Ebp;
-  frame.AddrFrame.Mode = AddrModeFlat;
+
+#if defined(__MINGW32__) && !defined(__MINGW64__) /* on 32 bit */
+  frame.AddrPC.Offset = context->Eip;     /* program counter */
+  frame.AddrFrame.Offset = context->Ebp;  /* frame pointer */
+  frame.AddrStack.Offset = context->Esp;  /* stack pointer */
+#elif defined(__MINGW32__) && defined(__MINGW64__) /* on 64 bit */
+  frame.AddrPC.Offset = context->Rip;     /* program counter */
+  frame.AddrFrame.Offset = context->Rbp;  /* frame pointer */
+  frame.AddrStack.Offset = context->Rsp;  /* stack pointer */
 #endif
+  frame.AddrPC.Mode = AddrModeFlat;
+  frame.AddrStack.Mode = AddrModeFlat;
+  frame.AddrFrame.Mode = AddrModeFlat;
+
   HANDLE process = GetCurrentProcess();
   HANDLE thread = GetCurrentThread();
 
@@ -205,11 +209,11 @@ _backtrace(struct output_buffer *ob, struct bfd_set *set, int depth , LPCONTEXT 
     symbol->SizeOfStruct = (sizeof *symbol) + 255;
     symbol->MaxNameLength = 254;
 
-    DWORD module_base = SymGetModuleBase(process, frame.AddrPC.Offset);
+    HMODULE module_base = (HMODULE)SymGetModuleBase(process, frame.AddrPC.Offset);
 
     const char * module_name = "[unknown module]";
     if (module_base &&
-        GetModuleFileNameA((HINSTANCE)module_base, module_name_raw, MAX_PATH)) {
+        GetModuleFileNameA((HMODULE)module_base, module_name_raw, (DWORD)MAX_PATH)) {
       module_name = module_name_raw;
       bc = get_bc(ob, set, module_name);
     }
@@ -223,7 +227,11 @@ _backtrace(struct output_buffer *ob, struct bfd_set *set, int depth , LPCONTEXT 
     }
 
     if (file == NULL) {
+#if defined(__MINGW32__) && !defined(__MINGW64__) /* on 32 bit */
       DWORD dummy = 0;
+#elif defined(__MINGW32__) && defined(__MINGW64__) /* on 64 bit */
+      DWORD64 dummy = 0;
+#endif
       if (SymGetSymFromAddr(process, frame.AddrPC.Offset, &dummy, symbol)) {
         file = symbol->Name;
       }
