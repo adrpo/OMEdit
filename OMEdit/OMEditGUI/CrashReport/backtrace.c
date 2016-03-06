@@ -162,6 +162,18 @@ release_set(struct bfd_set *set)
   }
 }
 
+#if defined(__MINGW32__) && !defined(__MINGW64__) /* on 32 bit */
+#define REG_BP Ebp /* frame pointer */
+#define REG_IP Eip /* program counter */
+#define REG_SP Esp /* stack pointer */
+#define IMAGE_FILE_MACHINE_NATIVE IMAGE_FILE_MACHINE_I386
+#elif defined(__MINGW32__) && defined(__MINGW64__) /* on 64 bit */
+#define REG_BP Rbp /* frame pointer */
+#define REG_IP Rip /* program counter */
+#define REG_SP Rsp /* stack pointer */
+#define IMAGE_FILE_MACHINE_NATIVE IMAGE_FILE_MACHINE_AMD64
+#endif
+
 void
 _backtrace(struct output_buffer *ob, struct bfd_set *set, int depth , LPCONTEXT context)
 {
@@ -173,17 +185,11 @@ _backtrace(struct output_buffer *ob, struct bfd_set *set, int depth , LPCONTEXT 
   STACKFRAME frame;
   memset(&frame,0,sizeof(frame));
 
-#if defined(__MINGW32__) && !defined(__MINGW64__) /* on 32 bit */
-  frame.AddrPC.Offset = context->Eip;     /* program counter */
-  frame.AddrFrame.Offset = context->Ebp;  /* frame pointer */
-  frame.AddrStack.Offset = context->Esp;  /* stack pointer */
-#elif defined(__MINGW32__) && defined(__MINGW64__) /* on 64 bit */
-  frame.AddrPC.Offset = context->Rip;     /* program counter */
-  frame.AddrFrame.Offset = context->Rbp;  /* frame pointer */
-  frame.AddrStack.Offset = context->Rsp;  /* stack pointer */
-#endif
+  frame.AddrPC.Offset = context->REG_IP;     /* program counter */
   frame.AddrPC.Mode = AddrModeFlat;
+  frame.AddrStack.Offset = context->REG_SP;  /* stack pointer */
   frame.AddrStack.Mode = AddrModeFlat;
+  frame.AddrFrame.Offset = context->REG_BP;  /* frame pointer */
   frame.AddrFrame.Mode = AddrModeFlat;
 
   HANDLE process = GetCurrentProcess();
@@ -192,7 +198,7 @@ _backtrace(struct output_buffer *ob, struct bfd_set *set, int depth , LPCONTEXT 
   char symbol_buffer[sizeof(IMAGEHLP_SYMBOL) + 255];
   char module_name_raw[MAX_PATH];
 
-  while(StackWalk(IMAGE_FILE_MACHINE_I386,
+  while(StackWalk(IMAGE_FILE_MACHINE_NATIVE,
                   process,
                   thread,
                   &frame,
@@ -209,11 +215,11 @@ _backtrace(struct output_buffer *ob, struct bfd_set *set, int depth , LPCONTEXT 
     symbol->SizeOfStruct = (sizeof *symbol) + 255;
     symbol->MaxNameLength = 254;
 
-    HMODULE module_base = (HMODULE)SymGetModuleBase(process, frame.AddrPC.Offset);
+    HINSTANCE module_base = (HINSTANCE)SymGetModuleBase(process, frame.AddrPC.Offset);
 
     const char * module_name = "[unknown module]";
     if (module_base &&
-        GetModuleFileNameA((HMODULE)module_base, module_name_raw, (DWORD)MAX_PATH)) {
+        GetModuleFileNameA(module_base, module_name_raw, (DWORD)MAX_PATH)) {
       module_name = module_name_raw;
       bc = get_bc(ob, set, module_name);
     }
@@ -227,12 +233,7 @@ _backtrace(struct output_buffer *ob, struct bfd_set *set, int depth , LPCONTEXT 
     }
 
     if (file == NULL) {
-#if defined(__MINGW32__) && !defined(__MINGW64__) /* on 32 bit */
-      DWORD dummy = 0;
-#elif defined(__MINGW32__) && defined(__MINGW64__) /* on 64 bit */
-      DWORD64 dummy = 0;
-#endif
-      if (SymGetSymFromAddr(process, frame.AddrPC.Offset, &dummy, symbol)) {
+      if (SymGetSymFromAddr(process, frame.AddrPC.Offset, NULL, symbol)) {
         file = symbol->Name;
       }
       else {
