@@ -75,6 +75,11 @@ ComponentInfo::ComponentInfo(QObject *pParent)
   mModifiersMap.clear();
   mParameterValueLoaded = false;
   mParameterValue = "";
+  mStartCommand = "";
+  mExactStep = false;
+  mModelFile = "";
+  mPosition = "";
+  mAngle321 = "";
 }
 
 /*!
@@ -116,6 +121,11 @@ void ComponentInfo::updateComponentInfo(const ComponentInfo *pComponentInfo)
   mModifiersMap = pComponentInfo->getModifiersMapWithoutFetching();
   mParameterValueLoaded = pComponentInfo->isParameterValueLoaded();
   mParameterValue = pComponentInfo->getParameterValueWithoutFetching();
+  mStartCommand = pComponentInfo->getStartCommand();
+  mExactStep = pComponentInfo->getExactStep();
+  mModelFile = pComponentInfo->getModelFile();
+  mPosition = pComponentInfo->getPosition();
+  mAngle321 = pComponentInfo->getAngle321();
 }
 
 /*!
@@ -301,7 +311,10 @@ bool ComponentInfo::operator==(const ComponentInfo &componentInfo) const
       (componentInfo.getOuter() == this->getOuter()) && (componentInfo.getCausality() == this->getCausality()) &&
       (componentInfo.getArrayIndex() == this->getArrayIndex()) &&
       (componentInfo.getModifiersMapWithoutFetching() == this->getModifiersMapWithoutFetching()) &&
-      (componentInfo.getParameterValueWithoutFetching() == this->getParameterValueWithoutFetching());
+      (componentInfo.getParameterValueWithoutFetching() == this->getParameterValueWithoutFetching()) &&
+      (componentInfo.getStartCommand() == this->getStartCommand()) && (componentInfo.getExactStep() == this->getExactStep()) &&
+      (componentInfo.getModelFile() == this->getModelFile()) && (componentInfo.getPosition() == this->getPosition()) &&
+      (componentInfo.getAngle321() == this->getAngle321());
 }
 
 /*!
@@ -343,8 +356,9 @@ Component::Component(QString name, LibraryTreeItem *pLibraryTreeItem, QString tr
   setComponentFlags(true);
   createNonExistingComponent();
   createDefaultComponent();
-  if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::TLM) {
-//    parseAnnotationString(Helper::defaultComponentAnnotationString);
+  if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::MetaModel) {
+    mpDefaultComponentRectangle->setVisible(true);
+    mpDefaultComponentText->setVisible(true);
   } else {
     drawComponent();
   }
@@ -1201,10 +1215,10 @@ void Component::createActions()
   mpViewDocumentationAction = new QAction(QIcon(":/Resources/icons/info-icon.svg"), Helper::viewDocumentation, mpGraphicsView);
   mpViewDocumentationAction->setStatusTip(Helper::viewDocumentationTip);
   connect(mpViewDocumentationAction, SIGNAL(triggered()), SLOT(viewDocumentation()));
-  // TLM  attributes Action
-  mpTLMAttributesAction = new QAction(Helper::attributes, mpGraphicsView);
-  mpTLMAttributesAction->setStatusTip(tr("Shows the component attributes"));
-  connect(mpTLMAttributesAction, SIGNAL(triggered()), SLOT(showTLMAttributes()));
+  // SubModel attributes Action
+  mpSubModelAttributesAction = new QAction(Helper::attributes, mpGraphicsView);
+  mpSubModelAttributesAction->setStatusTip(tr("Shows the submodel attributes"));
+  connect(mpSubModelAttributesAction, SIGNAL(triggered()), SLOT(showSubModelAttributes()));
 }
 
 void Component::createResizerItems()
@@ -1454,11 +1468,11 @@ void Component::updatePlacementAnnotation()
 {
   // Add component annotation.
   LibraryTreeItem *pLibraryTreeItem = mpGraphicsView->getModelWidget()->getLibraryTreeItem();
-  if (pLibraryTreeItem->getLibraryType()== LibraryTreeItem::TLM) {
-    TLMEditor *pTLMEditor = dynamic_cast<TLMEditor*>(mpGraphicsView->getModelWidget()->getEditor());
-    pTLMEditor->updateSubModelPlacementAnnotation(mpComponentInfo->getName(), mTransformation.getVisible()? "true" : "false",
-                                                  getTransformationOrigin(), getTransformationExtent(),
-                                                  QString::number(mTransformation.getRotateAngle()));
+  if (pLibraryTreeItem->getLibraryType()== LibraryTreeItem::MetaModel) {
+    MetaModelEditor *pMetaModelEditor = dynamic_cast<MetaModelEditor*>(mpGraphicsView->getModelWidget()->getEditor());
+    pMetaModelEditor->updateSubModelPlacementAnnotation(mpComponentInfo->getName(), mTransformation.getVisible()? "true" : "false",
+                                                        getTransformationOrigin(), getTransformationExtent(),
+                                                        QString::number(mTransformation.getRotateAngle()));
   } else {
     OMCProxy *pOMCProxy = mpGraphicsView->getModelWidget()->getModelWidgetContainer()->getMainWindow()->getOMCProxy();
     pOMCProxy->updateComponent(mpComponentInfo->getName(), mpComponentInfo->getClassName(),
@@ -1711,7 +1725,7 @@ void Component::resizedComponent()
   UpdateComponentTransformationsCommand *pUpdateComponentCommand = new UpdateComponentTransformationsCommand(this, mOldTransformation,
                                                                                                              mTransformation);
   mpGraphicsView->getModelWidget()->getUndoStack()->push(pUpdateComponentCommand);
-  mpGraphicsView->getModelWidget()->updateModelicaText();
+  mpGraphicsView->getModelWidget()->updateModelText();
 }
 
 /*!
@@ -2092,14 +2106,14 @@ void Component::viewDocumentation()
 }
 
 /*!
- * \brief Component::showTLMAttributes
+ * \brief Component::showSubModelAttributes
  * Slot that opens up the SubModelAttributes Dialog.
  */
-void Component::showTLMAttributes()
+void Component::showSubModelAttributes()
 {
   MainWindow *pMainWindow = mpGraphicsView->getModelWidget()->getModelWidgetContainer()->getMainWindow();
-  SubModelAttributes *pTLMComponentAttributes = new SubModelAttributes(this, pMainWindow);
-  pTLMComponentAttributes->exec();
+  SubModelAttributes *pSubModelAttributes = new SubModelAttributes(this, pMainWindow);
+  pSubModelAttributes->exec();
 }
 
 /*!
@@ -2112,8 +2126,8 @@ void Component::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 {
   Q_UNUSED(event);
   LibraryTreeItem *pLibraryTreeItem = mpGraphicsView->getModelWidget()->getLibraryTreeItem();
-  if(pLibraryTreeItem->getLibraryType()== LibraryTreeItem::TLM) {
-    emit showTLMAttributes();
+  if(pLibraryTreeItem->getLibraryType()== LibraryTreeItem::MetaModel) {
+    emit showSubModelAttributes();
   } else {
     if (!mpParentComponent) { // if root component is double clicked then show parameters.
       mpGraphicsView->removeCurrentConnection();
@@ -2175,8 +2189,8 @@ void Component::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
         menu.addAction(mpGraphicsView->getFlipHorizontalAction());
         menu.addAction(mpGraphicsView->getFlipVerticalAction());
         break;
-      case LibraryTreeItem::TLM:
-        menu.addAction(pComponent->getTLMAttributesAction());
+      case LibraryTreeItem::MetaModel:
+        menu.addAction(pComponent->getSubModelAttributesAction());
         break;
     }
     menu.exec(event->screenPos());

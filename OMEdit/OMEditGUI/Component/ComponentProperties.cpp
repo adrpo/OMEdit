@@ -953,7 +953,7 @@ void ComponentParameters::updateComponentParameters()
                                                                              oldComponentExtendsModifiersMap, newComponentModifiersMap,
                                                                              newComponentExtendsModifiersMap);
     mpComponent->getGraphicsView()->getModelWidget()->getUndoStack()->push(pUpdateComponentParametersCommand);
-    mpComponent->getGraphicsView()->getModelWidget()->updateModelicaText();
+    mpComponent->getGraphicsView()->getModelWidget()->updateModelText();
   }
   accept();
 }
@@ -1194,7 +1194,7 @@ void ComponentAttributes::updateComponentAttributes()
     UpdateComponentAttributesCommand *pUpdateComponentAttributesCommand = new UpdateComponentAttributesCommand(mpComponent, oldComponentInfo,
                                                                                                                newComponentInfo);
     pModelWidget->getUndoStack()->push(pUpdateComponentAttributesCommand);
-    pModelWidget->updateModelicaText();
+    pModelWidget->updateModelText();
   }
   accept();
 }
@@ -1283,19 +1283,15 @@ void SubModelAttributes::setUpDialog()
   */
 void SubModelAttributes::initializeDialog()
 {
-  // get component Name
+  // set Name
   mpNameTextBox->setText(mpComponent->getName());
-  // get the simulation start command and exact step flag of the submodel
-  LibraryTreeItem *pLibraryTreeItem = mpComponent->getGraphicsView()->getModelWidget()->getLibraryTreeItem();
-  if (pLibraryTreeItem->getLibraryType()== LibraryTreeItem::TLM) {
-    TLMEditor *pTLMEditor = dynamic_cast<TLMEditor*>(mpComponent->getGraphicsView()->getModelWidget()->getEditor());
-    mpStartCommandTextBox->setText(pTLMEditor->getSimulationToolStartCommand(mpComponent->getName()));
-    mpExactStepFlagCheckBox->setChecked(pTLMEditor->isExactStepFlagSet(mpComponent->getName()));
-  }
+  // set the start command
+  mpStartCommandTextBox->setText(mpComponent->getComponentInfo()->getStartCommand());
+  // set the exact step
+  mpExactStepFlagCheckBox->setChecked(mpComponent->getComponentInfo()->getExactStep());
   // get the simulation tool of the submodel
   mpSimulationToolComboBox->setCurrentIndex(StringHandler::getSimulationTool(mpStartCommandTextBox->text()));
-  QFileInfo fileInfo(mpComponent->getLibraryTreeItem()->getFileName());
-  mpModelFileTextBox->setText(fileInfo.fileName());
+  mpModelFileTextBox->setText(mpComponent->getComponentInfo()->getModelFile());
 }
 
 void SubModelAttributes::changeSimulationToolStartCommand(QString tool)
@@ -1308,21 +1304,30 @@ void SubModelAttributes::changeSimulationTool(QString simulationToolStartCommand
   mpSimulationToolComboBox->setCurrentIndex(StringHandler::getSimulationTool(simulationToolStartCommand));
 }
 
-
 /*!
-  Updates subModel parameters.\n
-  Slot activated when mpOkButton clicked signal is raised.
-  */
+ * \brief SubModelAttributes::updateSubModelParameters
+ * Updates subModel parameters.\n
+ * Slot activated when mpOkButton clicked signal is raised.
+ */
 void SubModelAttributes::updateSubModelParameters()
 {
-  QString exactStepFlag = mpExactStepFlagCheckBox->isChecked() ? "1" : "0";
-  LibraryTreeItem *pLibraryTreeItem = mpComponent->getGraphicsView()->getModelWidget()->getLibraryTreeItem();
-  if (pLibraryTreeItem->getLibraryType()== LibraryTreeItem::TLM) {
-    TLMEditor *pTLMEditor = dynamic_cast<TLMEditor*>(mpComponent->getGraphicsView()->getModelWidget()->getEditor());
-    pTLMEditor->updateSubModelParameters(mpComponent->getName(), mpStartCommandTextBox->text(), exactStepFlag);
-    accept();
+  // save the old ComponentInfo
+  ComponentInfo oldComponentInfo(mpComponent->getComponentInfo());
+  // Create a new ComponentInfo
+  ComponentInfo newComponentInfo(mpComponent->getComponentInfo());
+  newComponentInfo.setStartCommand(mpStartCommandTextBox->text());
+  newComponentInfo.setExactStep(mpExactStepFlagCheckBox->isChecked());
+  // If user has really changed the Component's attributes then push that change on the stack.
+  if (oldComponentInfo != newComponentInfo) {
+    UpdateSubModelAttributesCommand *pUpdateSubModelAttributesCommand = new UpdateSubModelAttributesCommand(mpComponent, oldComponentInfo,
+                                                                                                            newComponentInfo);
+    ModelWidget *pModelWidget = mpComponent->getGraphicsView()->getModelWidget();
+    pModelWidget->getUndoStack()->push(pUpdateSubModelAttributesCommand);
+    pModelWidget->updateModelText();
   }
+  accept();
 }
+
 TLMInterfacePointInfo::TLMInterfacePointInfo(QString name, QString className, QString interfaceName)
 {
   mName = name;
@@ -1452,10 +1457,10 @@ void TLMConnectionAttributes::initializeDialog()
   */
 void TLMConnectionAttributes::createTLMConnection()
 {
-  TLMEditor *pTLMEditor = dynamic_cast<TLMEditor*>(mpMainWindow->getModelWidgetContainer()->getCurrentModelWidget()->getEditor());
+  MetaModelEditor *pMetaModelEditor = dynamic_cast<MetaModelEditor*>(mpMainWindow->getModelWidgetContainer()->getCurrentModelWidget()->getEditor());
   QString startFrom = mpStartSubModelNameTextBox->text().append(".").append(mpStartSubModelInterfacePointComboBox->currentText());
   QString endTo = mpEndSubModelNameTextBox->text().append(".").append(mpEndSubModelInterfacePointComboBox->currentText());
-  pTLMEditor->createConnection(startFrom, endTo, mpDelayTextBox->text(), mpAlphaTextBox->text(),mpZfTextBox->text(), mpZfrTextBox->text(),
-                               mpConnectionLineAnnotation->getTLMShapeAnnotation());
+  pMetaModelEditor->createConnection(startFrom, endTo, mpDelayTextBox->text(), mpAlphaTextBox->text(),mpZfTextBox->text(), mpZfrTextBox->text(),
+                                     mpConnectionLineAnnotation->getMetaModelShapeAnnotation());
   accept();
 }

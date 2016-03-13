@@ -182,7 +182,7 @@ QString Helper::unloadClass;
 QString Helper::duplicate;
 QString Helper::duplicateTip;
 QString Helper::unloadClassTip;
-QString Helper::unloadTLMOrTextTip;
+QString Helper::unloadMetaModelOrTextTip;
 QString Helper::refresh;
 QString Helper::simulate;
 QString Helper::simulateTip;
@@ -301,6 +301,8 @@ QString Helper::newVariable;
 QString Helper::library;
 QString Helper::moveUp;
 QString Helper::moveDown;
+QString Helper::fixErrorsManually;
+QString Helper::revertToLastCorrectVersion;
 
 void Helper::initHelperVariables()
 {
@@ -376,7 +378,7 @@ void Helper::initHelperVariables()
   Helper::duplicateTip = tr("Duplicates the item");
   Helper::unloadClass = tr("Unload");
   Helper::unloadClassTip = tr("Unload the Modelica class");
-  Helper::unloadTLMOrTextTip = tr("Unload the TLM/Text file");
+  Helper::unloadMetaModelOrTextTip = tr("Unload the MetaModel/Text file");
   Helper::refresh = tr("Refresh");
   Helper::simulate = tr("Simulate");
   Helper::simulateTip = tr("Simulates the Modelica class");
@@ -495,6 +497,8 @@ void Helper::initHelperVariables()
   Helper::library = tr("Library");
   Helper::moveUp = tr("Move Up");
   Helper::moveDown = tr("Move Down");
+  Helper::fixErrorsManually = tr("Fix error(s) manually");
+  Helper::revertToLastCorrectVersion = tr("Revert to last correct version");
 }
 
 QString GUIMessages::getMessage(int type)
@@ -527,8 +531,8 @@ QString GUIMessages::getMessage(int type)
       return tr("Could not find environment variable OPENMODELICAHOME. Please make sure OpenModelica is installed properly.");
     case ERROR_OCCURRED:
       return tr("Following error has occurred. \n\n%1");
-    case ERROR_IN_MODELICA_TEXT:
-      return tr("Problems are found in Modelica Text. <br />");
+    case ERROR_IN_TEXT:
+      return tr("Problems are found in %1 Text. <br />");
     case REVERT_PREVIOUS_OR_FIX_ERRORS_MANUALLY:
       return tr("<br /><br />If you cannot find the source of the error, you can always <b>revert to the last correct version</b>.");
     case NO_OPENMODELICA_KEYWORDS:
@@ -607,6 +611,8 @@ QString GUIMessages::getMessage(int type)
       return tr("TLM co-simulation session is already running. Only one session is allowed.");
     case TERMINAL_COMMAND_NOT_SET:
       return tr("Terminal command is not set. You can define a new terminal command in <b>%1->General->Terminal Command</b>.");
+    case UNABLE_FIND_COMPONENT:
+      return tr("Unable to find component %1 while parsing connection %2.");
     default:
       return "";
   }

@@ -226,7 +226,7 @@ private:
   QAction *mpLoadModelicaLibraryAction;
   QAction *mpOpenResultFileAction;
   QAction *mpOpenTransformationFileAction;
-  // TLM File Actions
+  // MetaModel File Actions
   QAction *mpNewMetaModelFileAction;
   QAction *mpOpenMetaModelFileAction;
   QAction *mpLoadExternModelAction;
@@ -402,6 +402,7 @@ public slots:
   void readInterfaceData(LibraryTreeItem *pLibraryTreeItem);
 private slots:
   void perspectiveTabChanged(int tabIndex);
+  void documentationDockWidgetVisibilityChanged(bool visible);
   void autoSave();
   void switchToWelcomePerspectiveSlot();
   void switchToModelingPerspectiveSlot();

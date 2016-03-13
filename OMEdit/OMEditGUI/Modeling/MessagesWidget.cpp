@@ -193,12 +193,12 @@ void MessagesWidget::addGUIMessage(MessageItem messageItem)
     } else {
       message = Qt::convertFromPlainText(messageItem.getMessage()).remove("<p>").remove("</p>");
     }
-  } else if(messageItem.getMessageItemType()== MessageItem::TLM) {
-    message = messageItem.getMessage().remove("<p>");
+  } else if(messageItem.getMessageItemType()== MessageItem::MetaModel) {
+    message = messageItem.getMessage().remove("<p>").remove("</p>");
   }
   if (messageItem.getFileName().isEmpty()) { // if custom error message
     errorMessage = message;
-  } else if (messageItem.getMessageItemType()== MessageItem::TLM ||
+  } else if (messageItem.getMessageItemType()== MessageItem::MetaModel ||
              mpMainWindow->getLibraryWidget()->getLibraryTreeModel()->findLibraryTreeItem(messageItem.getFileName())) {
     // If the class is only loaded in AST via loadString then create link for the error message.
     errorMessage = linkFormat.arg(messageItem.getFileName())
@@ -261,8 +261,12 @@ void MessagesWidget::openErrorMessageClass(QUrl url)
   if (className.startsWith("/")) className.remove(0, 1);
   LibraryTreeItem *pLibraryTreeItem = mpMainWindow->getLibraryWidget()->getLibraryTreeModel()->findLibraryTreeItem(className);
   if (pLibraryTreeItem) {
-    mpMainWindow->getLibraryWidget()->getLibraryTreeModel()->showModelWidget(pLibraryTreeItem);
     ModelWidget *pModelWidget = pLibraryTreeItem->getModelWidget();
+    if (pModelWidget) {
+      mpMainWindow->getModelWidgetContainer()->addModelWidget(pModelWidget, false);
+    } else {
+      mpMainWindow->getLibraryWidget()->getLibraryTreeModel()->showModelWidget(pLibraryTreeItem);
+    }
     if (pModelWidget && pModelWidget->getEditor()) {
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 0, 0))
       QUrlQuery query(url);

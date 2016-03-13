@@ -189,7 +189,7 @@ public:
   static QString duplicateTip;
   static QString unloadClass;
   static QString unloadClassTip;
-  static QString unloadTLMOrTextTip;
+  static QString unloadMetaModelOrTextTip;
   static QString refresh;
   static QString simulate;
   static QString simulateTip;
@@ -308,6 +308,8 @@ public:
   static QString library;
   static QString moveUp;
   static QString moveDown;
+  static QString fixErrorsManually;
+  static QString revertToLastCorrectVersion;
 };
 
 class GUIMessages : public QObject
@@ -329,7 +331,7 @@ public:
     ITEM_ALREADY_EXISTS,
     OPENMODELICAHOME_NOT_FOUND,
     ERROR_OCCURRED,
-    ERROR_IN_MODELICA_TEXT,
+    ERROR_IN_TEXT,
     REVERT_PREVIOUS_OR_FIX_ERRORS_MANUALLY,
     NO_OPENMODELICA_KEYWORDS,
     UNABLE_TO_LOAD_FILE,
@@ -368,7 +370,8 @@ public:
     TLMMANAGER_NOT_SET,
     METAMODEL_UNSAVED,
     TLMCOSIMULATION_ALREADY_RUNNING,
-    TERMINAL_COMMAND_NOT_SET
+    TERMINAL_COMMAND_NOT_SET,
+    UNABLE_FIND_COMPONENT
   };
 
   static QString getMessage(int type);

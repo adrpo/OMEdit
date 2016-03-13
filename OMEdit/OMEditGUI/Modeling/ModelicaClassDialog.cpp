@@ -57,7 +57,7 @@ LibraryBrowseDialog::LibraryBrowseDialog(QString title, QLineEdit *pLineEdit, Li
   connect(mpTreeSearchFilters->getCaseSensitiveCheckBox(), SIGNAL(toggled(bool)), SLOT(searchClasses()));
   connect(mpTreeSearchFilters->getSyntaxComboBox(), SIGNAL(currentIndexChanged(int)), SLOT(searchClasses()));
   // create the tree
-  mpLibraryTreeProxyModel = new LibraryTreeProxyModel(mpLibraryWidget);
+  mpLibraryTreeProxyModel = new LibraryTreeProxyModel(mpLibraryWidget, true);
   mpLibraryTreeProxyModel->setDynamicSortFilter(true);
   mpLibraryTreeProxyModel->setSourceModel(mpLibraryWidget->getLibraryTreeModel());
   mpLibraryTreeView = new QTreeView;
@@ -359,7 +359,7 @@ void ModelicaClassDialog::createModelicaClass()
   if (pLibraryTreeItem->getModelWidget()) {
     pLibraryTreeItem->getModelWidget()->getIconGraphicsView()->addClassAnnotation(false);
     pLibraryTreeItem->getModelWidget()->getDiagramGraphicsView()->addClassAnnotation(false);
-    pLibraryTreeItem->getModelWidget()->updateModelicaText();
+    pLibraryTreeItem->getModelWidget()->updateModelText();
   }
   accept();
 }
@@ -1295,7 +1295,7 @@ void GraphicsViewProperties::saveGraphicsViewProperties()
                                                                      mpCopyProperties->isChecked(), oldVersion, mpVersionTextBox->text(),
                                                                      oldUsesAnnotationString, newUsesAnnotationString);
   mpGraphicsView->getModelWidget()->getUndoStack()->push(pUpdateCoOrdinateSystemCommand);
-  mpGraphicsView->getModelWidget()->updateModelicaText();
+  mpGraphicsView->getModelWidget()->updateModelText();
   accept();
 }
 

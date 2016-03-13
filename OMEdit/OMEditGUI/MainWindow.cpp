@@ -184,6 +184,7 @@ MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent
   addDockWidget(Qt::RightDockWidgetArea, mpDocumentationDockWidget);
   setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
   mpDocumentationDockWidget->hide();
+  connect(mpDocumentationDockWidget, SIGNAL(visibilityChanged(bool)), SLOT(documentationDockWidgetVisibilityChanged(bool)));
   // Create VariablesWidget dock
   mpVariablesDockWidget = new QDockWidget(Helper::variablesBrowser, this);
   mpVariablesDockWidget->setObjectName("Variables");
@@ -274,8 +275,7 @@ MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent
   mpAutoSaveTimer = new QTimer(this);
   connect(mpAutoSaveTimer, SIGNAL(timeout()), SLOT(autoSave()));
   // read auto save settings
-  if (mpOptionsDialog->getGeneralSettingsPage()->getEnableAutoSaveGroupBox()->isChecked())
-  {
+  if (mpOptionsDialog->getGeneralSettingsPage()->getEnableAutoSaveGroupBox()->isChecked()) {
     mpAutoSaveTimer->start(mpOptionsDialog->getGeneralSettingsPage()->getAutoSaveIntervalSpinBox()->value() * 1000);
   }
 }
@@ -916,11 +916,10 @@ void MainWindow::fetchInterfaceData(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if MetaModel text is changed manually by user then validate it before fetaching the interface data. */
   if (pLibraryTreeItem->getModelWidget()) {
-      TLMEditor *pTLMEditor = dynamic_cast<TLMEditor*>(pLibraryTreeItem->getModelWidget()->getEditor());
-      if (pTLMEditor && !pTLMEditor->validateMetaModelText()) {
-          return;
-        }
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
+      return;
     }
+  }
   if (mpOptionsDialog->getTLMPage()->getTLMManagerProcessTextBox()->text().isEmpty()) {
     QString message;
 #ifdef Q_OS_MAC
@@ -964,33 +963,32 @@ void MainWindow::TLMSimulate(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if MetaModel text is changed manually by user then validate it before starting the TLM co-simulation. */
   if (pLibraryTreeItem->getModelWidget()) {
-      TLMEditor *pTLMEditor = dynamic_cast<TLMEditor*>(pLibraryTreeItem->getModelWidget()->getEditor());
-      if (pTLMEditor && !pTLMEditor->validateMetaModelText()) {
-          return;
-        }
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
+      return;
     }
+  }
   if (pLibraryTreeItem->isSaved()) {
-      mpTLMCoSimulationDialog->show(pLibraryTreeItem);
-    } else {
-      QMessageBox *pMessageBox = new QMessageBox(this);
-      pMessageBox->setWindowTitle(QString(Helper::applicationName).append(" - ").append(Helper::question));
-      pMessageBox->setIcon(QMessageBox::Question);
-      pMessageBox->setAttribute(Qt::WA_DeleteOnClose);
-      pMessageBox->setText(GUIMessages::getMessage(GUIMessages::METAMODEL_UNSAVED).arg(pLibraryTreeItem->getNameStructure()));
-      pMessageBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-      pMessageBox->setDefaultButton(QMessageBox::Yes);
-      int answer = pMessageBox->exec();
-      switch (answer) {
-        case QMessageBox::Yes:
-          if (mpLibraryWidget->saveLibraryTreeItem(pLibraryTreeItem)) {
-              mpTLMCoSimulationDialog->show(pLibraryTreeItem);
-            }
-          break;
-        case QMessageBox::No:
-        default:
-          break;
+    mpTLMCoSimulationDialog->show(pLibraryTreeItem);
+  } else {
+    QMessageBox *pMessageBox = new QMessageBox(this);
+    pMessageBox->setWindowTitle(QString(Helper::applicationName).append(" - ").append(Helper::question));
+    pMessageBox->setIcon(QMessageBox::Question);
+    pMessageBox->setAttribute(Qt::WA_DeleteOnClose);
+    pMessageBox->setText(GUIMessages::getMessage(GUIMessages::METAMODEL_UNSAVED).arg(pLibraryTreeItem->getNameStructure()));
+    pMessageBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+    pMessageBox->setDefaultButton(QMessageBox::Yes);
+    int answer = pMessageBox->exec();
+    switch (answer) {
+      case QMessageBox::Yes:
+        if (mpLibraryWidget->saveLibraryTreeItem(pLibraryTreeItem)) {
+          mpTLMCoSimulationDialog->show(pLibraryTreeItem);
         }
+        break;
+      case QMessageBox::No:
+      default:
+        break;
     }
+  }
 }
 
 void MainWindow::exportModelToOMNotebook(LibraryTreeItem *pLibraryTreeItem)
@@ -1305,7 +1303,7 @@ void MainWindow::showOpenTransformationFileDialog()
 void MainWindow::createNewMetaModelFile()
 {
   QString metaModelName = mpLibraryWidget->getLibraryTreeModel()->getUniqueTopLevelItemName("MetaModel");
-  LibraryTreeItem *pLibraryTreeItem = mpLibraryWidget->getLibraryTreeModel()->createLibraryTreeItem(LibraryTreeItem::TLM, metaModelName, false);
+  LibraryTreeItem *pLibraryTreeItem = mpLibraryWidget->getLibraryTreeModel()->createLibraryTreeItem(LibraryTreeItem::MetaModel, metaModelName, false);
   if (pLibraryTreeItem) {
     pLibraryTreeItem->setSaveContentsType(LibraryTreeItem::SaveInOneFile);
     mpLibraryWidget->getLibraryTreeModel()->showModelWidget(pLibraryTreeItem);
@@ -1313,9 +1311,10 @@ void MainWindow::createNewMetaModelFile()
 }
 
 /*!
-  Opens the TLM file(s).\n
-  Slot activated when mpOpenMetaModelFileAction triggered signal is raised.
-  */
+ * \brief MainWindow::openMetaModelFile
+ * Opens the MetaModel file(s).\n
+ * Slot activated when mpOpenMetaModelFileAction triggered signal is raised.
+ */
 void MainWindow::openMetaModelFile()
 {
   QStringList fileNames;
@@ -1469,7 +1468,7 @@ void MainWindow::undo()
     pModelWidget->clearSelection();
     pModelWidget->getUndoStack()->undo();
     pModelWidget->updateClassAnnotationIfNeeded();
-    pModelWidget->updateModelicaText();
+    pModelWidget->updateModelText();
   }
 }
 
@@ -1486,7 +1485,7 @@ void MainWindow::redo()
     pModelWidget->clearSelection();
     pModelWidget->getUndoStack()->redo();
     pModelWidget->updateClassAnnotationIfNeeded();
-    pModelWidget->updateModelicaText();
+    pModelWidget->updateModelText();
   }
 }
 
@@ -2175,8 +2174,21 @@ void MainWindow::toggleShapesButton()
   }
 }
 
+/*!
+ * \brief MainWindow::openRecentModelWidget
+ * Slot activated when mpModelSwitcherActions triggered SIGNAL is raised.\n
+ * Before switching to new ModelWidget try to update the class contents if user has changed anything.
+ */
 void MainWindow::openRecentModelWidget()
 {
+  /* if Model text is changed manually by user then validate it before opening recent ModelWidget. */
+  ModelWidget *pModelWidget = mpModelWidgetContainer->getCurrentModelWidget();
+  if (pModelWidget && pModelWidget->getLibraryTreeItem()) {
+    LibraryTreeItem *pLibraryTreeItem = pModelWidget->getLibraryTreeItem();
+    if (!pModelWidget->validateText(&pLibraryTreeItem)) {
+      return;
+    }
+  }
   QAction *pAction = qobject_cast<QAction*>(sender());
   QToolButton *pToolButton = qobject_cast<QToolButton*>(sender());
   LibraryTreeItem *pLibraryTreeItem;
@@ -2310,15 +2322,19 @@ void MainWindow::readInterfaceData(LibraryTreeItem *pLibraryTreeItem)
     if (!pLibraryTreeItem->getModelWidget()) {
       mpLibraryWidget->getLibraryTreeModel()->showModelWidget(pLibraryTreeItem);
     }
-    TLMEditor *pTLMEditor = dynamic_cast<TLMEditor*>(pLibraryTreeItem->getModelWidget()->getEditor());
-    pTLMEditor->addInterfacesData(interfaces);
+    MetaModelEditor *pMetaModelEditor = dynamic_cast<MetaModelEditor*>(pLibraryTreeItem->getModelWidget()->getEditor());
+    pMetaModelEditor->addInterfacesData(interfaces);
   }
 }
 
+/*!
+ * \brief MainWindow::perspectiveTabChanged
+ * Handles the perspective tab changed case.
+ * \param tabIndex
+ */
 void MainWindow::perspectiveTabChanged(int tabIndex)
 {
-  switch (tabIndex)
-  {
+  switch (tabIndex) {
     case 0:
       switchToWelcomePerspective();
       break;
@@ -2331,6 +2347,24 @@ void MainWindow::perspectiveTabChanged(int tabIndex)
     default:
       switchToWelcomePerspective();
       break;
+  }
+}
+
+/*!
+ * \brief MainWindow::documentationDockWidgetVisibilityChanged
+ * Handles the VisibilityChanged signal of Documentation Dock Widget.
+ * \param visible
+ */
+void MainWindow::documentationDockWidgetVisibilityChanged(bool visible)
+{
+  if (visible) {
+    ModelWidget *pModelWidget = mpModelWidgetContainer->getCurrentModelWidget();
+    if (pModelWidget && pModelWidget->getLibraryTreeItem()) {
+      LibraryTreeItem *pLibraryTreeItem = pModelWidget->getLibraryTreeItem();
+      if (pModelWidget->validateText(&pLibraryTreeItem)) {
+        mpDocumentationWidget->showDocumentation(pLibraryTreeItem);
+      }
+    }
   }
 }
 
@@ -2374,16 +2408,31 @@ void MainWindow::autoSave()
 //  }
 }
 
+/*!
+ * \brief MainWindow::switchToWelcomePerspectiveSlot
+ * Slot activated when Ctrl+f1 is clicked.
+ * Switches to welcome perspective.
+ */
 void MainWindow::switchToWelcomePerspectiveSlot()
 {
   mpPerspectiveTabbar->setCurrentIndex(0);
 }
 
+/*!
+ * \brief MainWindow::switchToModelingPerspectiveSlot
+ * Slot activated when Ctrl+f2 is clicked.
+ * Switches to modeling perspective.
+ */
 void MainWindow::switchToModelingPerspectiveSlot()
 {
   mpPerspectiveTabbar->setCurrentIndex(1);
 }
 
+/*!
+ * \brief MainWindow::switchToPlottingPerspectiveSlot
+ * Slot activated when Ctrl+f3 is clicked.
+ * Switches to plotting perspective.
+ */
 void MainWindow::switchToPlottingPerspectiveSlot()
 {
   mpPerspectiveTabbar->setCurrentIndex(2);
@@ -2425,8 +2474,8 @@ void MainWindow::createActions()
   mpNewMetaModelFileAction = new QAction(QIcon(":/Resources/icons/new.svg"), tr("New MetaModel"), this);
   mpNewMetaModelFileAction->setStatusTip(tr("Create New MetaModel File"));
   connect(mpNewMetaModelFileAction, SIGNAL(triggered()), SLOT(createNewMetaModelFile()));
-  // open TLM file action
-  mpOpenMetaModelFileAction = new QAction(QIcon(":/Resources/icons/open.svg"), tr("Open MetaModel"), this);
+  // open MetaModel file action
+  mpOpenMetaModelFileAction = new QAction(QIcon(":/Resources/icons/open.svg"), tr("Open MetaModel(s)"), this);
   mpOpenMetaModelFileAction->setStatusTip(tr("Opens the MetaModel file(s)"));
   connect(mpOpenMetaModelFileAction, SIGNAL(triggered()), SLOT(openMetaModelFile()));
   // load External Model action
@@ -2762,7 +2811,7 @@ void MainWindow::createActions()
   mpFetchInterfaceDataAction = new QAction(QIcon(":/Resources/icons/interface-data.svg"), Helper::fetchInterfaceData, this);
   mpFetchInterfaceDataAction->setStatusTip(Helper::fetchInterfaceDataTip);
   connect(mpFetchInterfaceDataAction, SIGNAL(triggered()), SLOT(fetchInterfaceData()));
-  // TLM simulate actions
+  // TLM simulate action
   mpTLMCoSimulationAction = new QAction(QIcon(":/Resources/icons/tlm-simulate.svg"), Helper::tlmCoSimulationSetup, this);
   mpTLMCoSimulationAction->setStatusTip(Helper::tlmCoSimulationSetupTip);
   mpTLMCoSimulationAction->setEnabled(false);
@@ -2965,8 +3014,22 @@ void MainWindow::storePlotWindowsStateAndGeometry()
   }
 }
 
+/*!
+ * \brief MainWindow::switchToWelcomePerspective
+ * Switches to Welcome perspective.
+ */
 void MainWindow::switchToWelcomePerspective()
 {
+  ModelWidget *pModelWidget = mpModelWidgetContainer->getCurrentModelWidget();
+  if (pModelWidget && pModelWidget->getLibraryTreeItem()) {
+    LibraryTreeItem *pLibraryTreeItem = pModelWidget->getLibraryTreeItem();
+    if (!pModelWidget->validateText(&pLibraryTreeItem)) {
+      bool signalsState = mpPerspectiveTabbar->blockSignals(true);
+      mpPerspectiveTabbar->setCurrentIndex(1);
+      mpPerspectiveTabbar->blockSignals(signalsState);
+      return;
+    }
+  }
   storePlotWindowsStateAndGeometry();
   mpPlotWindowContainer->tileSubWindows();
   mpCentralStackedWidget->setCurrentWidget(mpWelcomePageWidget);
@@ -2978,6 +3041,10 @@ void MainWindow::switchToWelcomePerspective()
   mpPlotToolBar->setEnabled(false);
 }
 
+/*!
+ * \brief MainWindow::switchToModelingPerspective
+ * Switches to Modeling perspective.
+ */
 void MainWindow::switchToModelingPerspective()
 {
   storePlotWindowsStateAndGeometry();
@@ -2993,8 +3060,22 @@ void MainWindow::switchToModelingPerspective()
   }
 }
 
+/*!
+ * \brief MainWindow::switchToPlottingPerspective
+ * Switches to plotting perspective.
+ */
 void MainWindow::switchToPlottingPerspective()
 {
+  ModelWidget *pModelWidget = mpModelWidgetContainer->getCurrentModelWidget();
+  if (pModelWidget && pModelWidget->getLibraryTreeItem()) {
+    LibraryTreeItem *pLibraryTreeItem = pModelWidget->getLibraryTreeItem();
+    if (!pModelWidget->validateText(&pLibraryTreeItem)) {
+      bool signalsState = mpPerspectiveTabbar->blockSignals(true);
+      mpPerspectiveTabbar->setCurrentIndex(1);
+      mpPerspectiveTabbar->blockSignals(signalsState);
+      return;
+    }
+  }
   mpCentralStackedWidget->setCurrentWidget(mpPlotWindowContainer);
   int i = 0;
   foreach (QMdiSubWindow *pWindow, mpPlotWindowContainer->subWindowList()) {
@@ -3085,8 +3166,7 @@ void MainWindow::fetchInterfaceDataHelper(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
   if (pLibraryTreeItem->getModelWidget()) {
-    TLMEditor *pTLMEditor = dynamic_cast<TLMEditor*>(pLibraryTreeItem->getModelWidget()->getEditor());
-    if (pTLMEditor && !pTLMEditor->validateMetaModelText()) {
+    if (!pLibraryTreeItem->getModelWidget()->validateText(&pLibraryTreeItem)) {
       return;
     }
   }

@@ -53,7 +53,7 @@
 #include "Helper.h"
 #include "BaseEditor.h"
 #include "ModelicaTextEditor.h"
-#include "TLMEditor.h"
+#include "MetaModelEditor.h"
 #include "TextEditor.h"
 
 class ModelWidget;
@@ -317,7 +317,7 @@ private slots:
 
 class ModelWidgetContainer;
 class ModelicaTextHighlighter;
-class TLMHighlighter;
+class MetaModelHighlighter;
 class Label;
 class ModelWidget : public QWidget
 {
@@ -360,7 +360,7 @@ public:
   void updateChildClasses(LibraryTreeItem *pLibraryTreeItem);
   void clearSelection();
   void updateClassAnnotationIfNeeded();
-  void updateModelicaText();
+  void updateModelText();
   void updateModelicaTextManually(QString contents);
   void updateUndoRedoActions();
 private:
@@ -385,7 +385,7 @@ private:
   QUndoView *mpUndoView;
   BaseEditor *mpEditor;
   ModelicaTextHighlighter *mpModelicaTextHighlighter;
-  TLMHighlighter *mpTLMHighlighter;
+  MetaModelHighlighter *mpMetaModelHighlighter;
   QStatusBar *mpModelStatusBar;
   bool mDiagramViewLoaded;
   bool mConnectionsLoaded;
@@ -408,7 +408,7 @@ private:
   void drawModelInheritedClassConnections(ModelWidget *pModelWidget);
   void removeInheritedClassConnections();
   void getModelConnections();
-  void getTLMComponents();
+  void getTLMSubModels();
   void getTLMConnections();
 private slots:
   void showIconView(bool checked);
@@ -417,7 +417,7 @@ private slots:
 public slots:
   void makeFileWritAble();
   void showDocumentationView();
-  bool TLMEditorTextChanged();
+  bool MetaModelEditorTextChanged();
   void handleCanUndoChanged(bool canUndo);
   void handleCanRedoChanged(bool canRedo);
 protected:
@@ -447,7 +447,7 @@ private:
   QListWidget *mpRecentModelsList;
   void loadPreviousViewType(ModelWidget *pModelWidget);
 public slots:
-  void openRecentModelWidget(QListWidgetItem *pItem);
+  bool openRecentModelWidget(QListWidgetItem *pListWidgetItem);
   void currentModelWidgetChanged(QMdiSubWindow *pSubWindow);
   void saveModelWidget();
   void saveAsModelWidget();

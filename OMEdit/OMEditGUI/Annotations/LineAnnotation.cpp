@@ -466,7 +466,7 @@ QString LineAnnotation::getShapeAnnotation()
   return QString("Line(").append(annotationString.join(",")).append(")");
 }
 
-QString LineAnnotation::getTLMShapeAnnotation()
+QString LineAnnotation::getMetaModelShapeAnnotation()
 {
   QStringList annotationString;
   annotationString.append(GraphicItem::getShapeAnnotation());
@@ -710,11 +710,10 @@ void LineAnnotation::handleComponentMoved()
  */
 void LineAnnotation::updateConnectionAnnotation()
 {
-  if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getLibraryType()== LibraryTreeItem::TLM) {
-    TLMEditor *pTLMEditor = dynamic_cast<TLMEditor*>(mpGraphicsView->getModelWidget()->getEditor());
-    pTLMEditor->updateTLMConnectiontAnnotation(getStartComponentName(), getEndComponentName(), getTLMShapeAnnotation());
-
-   } else {
+  if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getLibraryType()== LibraryTreeItem::MetaModel) {
+    MetaModelEditor *pMetaModelEditor = dynamic_cast<MetaModelEditor*>(mpGraphicsView->getModelWidget()->getEditor());
+    pMetaModelEditor->updateConnection(getStartComponentName(), getEndComponentName(), getMetaModelShapeAnnotation());
+  } else {
     // get the connection line annotation.
     QString annotationString = QString("annotate=").append(getShapeAnnotation());
     // update the connection
@@ -1505,6 +1504,6 @@ void CreateConnectionDialog::createArrayConnection()
   mpConnectionLineAnnotation->setEndComponentName(endComponentName);
   mpGraphicsView->getModelWidget()->getUndoStack()->push(new AddConnectionCommand(mpConnectionLineAnnotation, true));
   mpGraphicsView->getModelWidget()->getLibraryTreeItem()->emitConnectionAdded(mpConnectionLineAnnotation);
-  mpGraphicsView->getModelWidget()->updateModelicaText();
+  mpGraphicsView->getModelWidget()->updateModelText();
   accept();
 }

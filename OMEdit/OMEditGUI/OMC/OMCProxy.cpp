@@ -60,6 +60,7 @@ void omc_Main_setWindowsPaths(threadData_t *threadData, void* _inOMHome);
 
 #include "OMCProxy.h"
 #include "simulation_options.h"
+#include "omc_error.h"
 
 static QVariant parseExpression(QString result)
 {
@@ -1648,18 +1649,20 @@ QString OMCProxy::diffModelicaFileListings(QString before, QString after)
 }
 
 /*!
-  Adds annotation to the class.
-  \param className - the name of the class.
-  \param annotation - the annotaiton to set for the class.
-  \return true on success.
-  */
+ * \brief OMCProxy::addClassAnnotation
+ * Adds annotation to the class.
+ * \param className - the name of the class.
+ * \param annotation - the annotaiton to set for the class.
+ * \return true on success.
+ */
 bool OMCProxy::addClassAnnotation(QString className, QString annotation)
 {
   sendCommand("addClassAnnotation(" + className + ", " + annotation + ")");
-  if (StringHandler::unparseBool(getResult()))
+  if (StringHandler::unparseBool(getResult())) {
     return true;
-  else
+  } else {
     return false;
+  }
 }
 
 /*!
@@ -1851,19 +1854,25 @@ bool OMCProxy::setComponentDimensions(QString className, QString componentName, 
 }
 
 /*!
-  Adds a connection
-  \param from - the connection start component name.
-  \param to - the connection end component name.
-  \param className - the name of the class.
-  \return true on success.
-  */
+ * \brief OMCProxy::addConnection
+ * Adds a connection
+ * \param from - the connection start component name.
+ * \param to - the connection end component name.
+ * \param className - the name of the class.
+ * \return true on success.
+ */
 bool OMCProxy::addConnection(QString from, QString to, QString className, QString annotation)
 {
-  sendCommand("addConnection(" + from + "," + to + "," + className + "," + annotation + ")");
-  if (getResult().contains("Ok"))
+  if (annotation.compare("annotate=Line()") == 0) {
+    sendCommand("addConnection(" + from + "," + to + "," + className + ")");
+  } else {
+    sendCommand("addConnection(" + from + "," + to + "," + className + "," + annotation + ")");
+  }
+  if (getResult().contains("Ok")) {
     return true;
-  else
+  } else {
     return false;
+  }
 }
 
 /*!
@@ -2456,6 +2465,20 @@ void OMCProxy::getNonLinearSolvers(QStringList *methods, QStringList *descriptio
   for (int i = NLS_NONE + 1 ; i < NLS_MAX ; i++) {
     *methods << NLS_NAME[i];
     *descriptions << NLS_DESC[i];
+  }
+}
+
+/*!
+ * \brief OMCProxy::getLogStreams
+ * Returns the list of simulation logging flags name and their description.
+ * \param names
+ * \param descriptions
+ */
+void OMCProxy::getLogStreams(QStringList *names, QStringList *descriptions)
+{
+  for (int i = firstOMCErrorStream ; i < SIM_LOG_MAX ; i++) {
+    *names << LOG_STREAM_NAME[i];
+    *descriptions << LOG_STREAM_DESC[i];
   }
 }
 
