@@ -197,6 +197,7 @@ public:
   static QString reSimulateTip;
   static QString reSimulateSetup;
   static QString reSimulateSetupTip;
+  static QString exportVariables;
   static QString simulateWithTransformationalDebugger;
   static QString simulateWithTransformationalDebuggerTip;
   static QString simulateWithAlgorithmicDebugger;
@@ -302,6 +303,8 @@ public:
   static QString tlmCoSimulationSetup;
   static QString tlmCoSimulationSetupTip;
   static QString tlmCoSimulation;
+  static QString simulationParams;
+  static QString simulationParamsTip;
   static QString running;
   static QString finished;
   static QString newVariable;

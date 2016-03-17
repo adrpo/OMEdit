@@ -97,4 +97,28 @@ private slots:
   void runTLMCoSimulation();
 };
 
+class MetaModelSimulationParamsDialog : public QDialog
+{
+  Q_OBJECT
+public:
+  MetaModelSimulationParamsDialog(GraphicsView *pGraphicsView);
+private:
+  GraphicsView *mpGraphicsView;
+  LibraryTreeItem *mpLibraryTreeItem;
+  Label *mpStartTimeLabel;
+  QLineEdit *mpStartTimeTextBox;
+  Label *mpStopTimeLabel;
+  QLineEdit *mpStopTimeTextBox;
+  QPushButton *mpSaveButton;
+  QPushButton *mpSaveAndCoSimulateButton;
+  QPushButton *mpCancelButton;
+  QDialogButtonBox *mpButtonBox;
+  QString mOldStartTime;
+  QString mOldStopTime;
+  bool validateSimulationParams();
+private slots:
+  void saveSimulationParams();
+  void saveSimulationParamsAndSimulate();
+};
+
 #endif // TLMCOSIMULATIONDIALOG_H

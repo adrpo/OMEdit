@@ -92,7 +92,7 @@ MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent
   mpMessagesDockWidget->hide();
   connect(mpMessagesWidget, SIGNAL(MessageAdded()), mpMessagesDockWidget, SLOT(show()));
   // Reopen the standard output stream.
-  QString outputFileName = mpOMCProxy->changeDirectory()+ "/omeditoutput.txt";
+  QString outputFileName = OpenModelica::tempDirectory() + "/omeditoutput.txt";
   freopen(outputFileName.toStdString().c_str(), "w", stdout);
   setbuf(stdout, NULL); // used non-buffered stdout
   mpOutputFileDataNotifier = 0;
@@ -107,7 +107,7 @@ MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent
 
   }
   // Reopen the standard error stream.
-  QString errorFileName = mpOMCProxy->changeDirectory()+ "/omediterror.txt";
+  QString errorFileName = OpenModelica::tempDirectory() + "/omediterror.txt";
   freopen(errorFileName.toStdString().c_str(), "w", stderr);
   setbuf(stderr, NULL); // used non-buffered stderr
   mpErrorFileDataNotifier = 0;
@@ -185,6 +185,10 @@ MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent
   setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
   mpDocumentationDockWidget->hide();
   connect(mpDocumentationDockWidget, SIGNAL(visibilityChanged(bool)), SLOT(documentationDockWidgetVisibilityChanged(bool)));
+  // Create an object of PlotWindowContainer
+  mpPlotWindowContainer = new PlotWindowContainer(this);
+  // create an object of VariablesWidget
+  mpVariablesWidget = new VariablesWidget(this);
   // Create VariablesWidget dock
   mpVariablesDockWidget = new QDockWidget(Helper::variablesBrowser, this);
   mpVariablesDockWidget->setObjectName("Variables");
@@ -192,6 +196,7 @@ MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent
   addDockWidget(Qt::RightDockWidgetArea, mpVariablesDockWidget);
   setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
   mpVariablesDockWidget->hide();
+  mpVariablesDockWidget->setWidget(mpVariablesWidget);
   //Create Actions, Toolbar and Menus
   pSplashScreen->showMessage(tr("Creating Widgets"), Qt::AlignRight, Qt::white);
   setAcceptDrops(true);
@@ -202,11 +207,6 @@ MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent
   mpSimulationDialog = new SimulationDialog(this);
   // Create TLM co-simulation dialog
   mpTLMCoSimulationDialog = new TLMCoSimulationDialog(this);
-  // Create an object of PlotWindowContainer
-  mpPlotWindowContainer = new PlotWindowContainer(this);
-  // create an object of VariablesWidget
-  mpVariablesWidget = new VariablesWidget(this);
-  mpVariablesDockWidget->setWidget(mpVariablesWidget);
   /* Debugger MainWindow */
   /* Important. Create the instance of DebuggerMainWindow before ModelWidgetContainer otherwise the ctrl+tab changer does not work. */
   mpDebuggerMainWindow = new DebuggerMainWindow(this);
@@ -273,248 +273,20 @@ MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent
   }
   // create the auto save timer
   mpAutoSaveTimer = new QTimer(this);
+  mpAutoSaveTimer->setInterval(mpOptionsDialog->getGeneralSettingsPage()->getAutoSaveIntervalSpinBox()->value() * 1000);
   connect(mpAutoSaveTimer, SIGNAL(timeout()), SLOT(autoSave()));
   // read auto save settings
   if (mpOptionsDialog->getGeneralSettingsPage()->getEnableAutoSaveGroupBox()->isChecked()) {
-    mpAutoSaveTimer->start(mpOptionsDialog->getGeneralSettingsPage()->getAutoSaveIntervalSpinBox()->value() * 1000);
+    mpAutoSaveTimer->start();
   }
 }
 
-//! Returns the instance of OMCProxy.
-//! @return Instance of OMCProxy.
-OMCProxy* MainWindow::getOMCProxy()
-{
-  return mpOMCProxy;
-}
-
-//! sets the value of ExitApplicationStatus variable.
-void MainWindow::setExitApplicationStatus(bool status)
-{
-  mExitApplicationStatus = status;
-}
-
-//! Returns the value of ExitApplicationStatus variable.
-bool MainWindow::getExitApplicationStatus()
-{
-  return mExitApplicationStatus;
-}
-
-OptionsDialog* MainWindow::getOptionsDialog()
-{
-  return mpOptionsDialog;
-}
-
-MessagesWidget* MainWindow::getMessagesWidget()
-{
-  return mpMessagesWidget;
-}
-
-LibraryWidget* MainWindow::getLibraryWidget()
-{
-  return mpLibraryWidget;
-}
-
-DocumentationWidget* MainWindow::getDocumentationWidget()
-{
-  return mpDocumentationWidget;
-}
-
-QDockWidget* MainWindow::getDocumentationDockWidget()
-{
-  return mpDocumentationDockWidget;
-}
-
-VariablesWidget* MainWindow::getVariablesWidget()
-{
-  return mpVariablesWidget;
-}
-
-QDockWidget* MainWindow::getVariablesDockWidget()
-{
-  return mpVariablesDockWidget;
-}
-
-SimulationDialog* MainWindow::getSimulationDialog()
-{
-  return mpSimulationDialog;
-}
-
-PlotWindowContainer* MainWindow::getPlotWindowContainer()
-{
-  return mpPlotWindowContainer;
-}
-
-ModelWidgetContainer* MainWindow::getModelWidgetContainer()
-{
-  return mpModelWidgetContainer;
-}
-
-WelcomePageWidget* MainWindow::getWelcomePageWidget()
-{
-  return mpWelcomePageWidget;
-}
-
-InfoBar* MainWindow::getInfoBar()
-{
-  return mpInfoBar;
-}
-
-QStatusBar* MainWindow::getStatusBar()
-{
-  return mpStatusBar;
-}
-
-QProgressBar* MainWindow::getProgressBar()
-{
-  return mpProgressBar;
-}
-
-Label* MainWindow::getPointerXPositionLabel()
-{
-  return mpPointerXPositionLabel;
-}
-
-Label* MainWindow::getPointerYPositionLabel()
-{
-  return mpPointerYPositionLabel;
-}
-
-QTabBar* MainWindow::getPerspectiveTabBar()
-{
-  return mpPerspectiveTabbar;
-}
-
-QAction* MainWindow::getSaveAction()
-{
-  return mpSaveAction;
-}
-
-QAction* MainWindow::getSaveAsAction()
-{
-  return mpSaveAsAction;
-}
-
-QAction* MainWindow::getPrintModelAction()
-{
-  return mpPrintModelAction;
-}
-
-QAction* MainWindow::getSaveAllAction()
-{
-  return mpSaveAllAction;
-}
-
-QAction* MainWindow::getShowGridLinesAction()
-{
-  return mpShowGridLinesAction;
-}
-
-QAction* MainWindow::getResetZoomAction()
-{
-  return mpResetZoomAction;
-}
-
-QAction* MainWindow::getZoomInAction()
-{
-  return mpZoomInAction;
-}
-
-QAction* MainWindow::getZoomOutAction()
-{
-  return mpZoomOutAction;
-}
-
-QAction* MainWindow::getSimulateModelAction()
-{
-  return mpSimulateModelAction;
-}
-
-QAction* MainWindow::getSimulationSetupAction()
-{
-  return mpSimulationSetupAction;
-}
-
-QAction* MainWindow::getInstantiateModelAction()
-{
-  return mpInstantiateModelAction;
-}
-
-QAction* MainWindow::getCheckModelAction()
-{
-  return mpCheckModelAction;
-}
-
-QAction* MainWindow::getExportFMUAction()
-{
-  return mpExportFMUAction;
-}
-
-QAction* MainWindow::getExportXMLAction()
-{
-  return mpExportXMLAction;
-}
-
-QAction* MainWindow::getExportFigaroAction()
-{
-  return mpExportFigaroAction;
-}
-
-QAction* MainWindow::getLineShapeAction()
-{
-  return mpLineShapeAction;
-}
-
-QAction* MainWindow::getPolygonShapeAction()
-{
-  return mpPolygonShapeAction;
-}
-
-QAction* MainWindow::getRectangleShapeAction()
-{
-  return mpRectangleShapeAction;
-}
-
-QAction* MainWindow::getEllipseShapeAction()
-{
-  return mpEllipseShapeAction;
-}
-
-QAction* MainWindow::getTextShapeAction()
-{
-  return mpTextShapeAction;
-}
-
-QAction* MainWindow::getBitmapShapeAction()
-{
-  return mpBitmapShapeAction;
-}
-
-QAction* MainWindow::getExportAsImageAction()
-{
-  return mpExportAsImageAction;
-}
-
-QAction* MainWindow::getExportToOMNotebookAction()
-{
-  return mpExportToOMNotebookAction;
-}
-
-QAction* MainWindow::getImportFromOMNotebookAction()
-{
-  return mpImportFromOMNotebookAction;
-}
-
-QAction* MainWindow::getImportNgspiceNetlistAction()
-{
-  return mpImportNgspiceNetlistAction;
-}
-
-QAction* MainWindow::getConnectModeAction()
-{
-  return mpConnectModeAction;
-}
-
-//! Adds the currently opened file to the recentFilesList settings.
+/*!
+ * \brief MainWindow::addRecentFile
+ * Adds the currently opened file to the recentFilesList settings.
+ * \param fileName
+ * \param encoding
+ */
 void MainWindow::addRecentFile(const QString &fileName, const QString &encoding)
 {
   QSettings *pSettings = OpenModelica::getApplicationSettings();
@@ -538,7 +310,10 @@ void MainWindow::addRecentFile(const QString &fileName, const QString &encoding)
   updateRecentFileActions();
 }
 
-//! Updates the actions of the recent files menu items.
+/*!
+ * \brief MainWindow::updateRecentFileActions
+ * Updates the actions of the recent files menu items.
+ */
 void MainWindow::updateRecentFileActions()
 {
   /* first set all recent files actions visibility to false. */
@@ -582,6 +357,11 @@ void MainWindow::closeEvent(QCloseEvent *event)
   }
 }
 
+/*!
+ * \brief MainWindow::askForExit
+ * Asks the user before exiting.
+ * \return
+ */
 int MainWindow::askForExit()
 {
   if (!mpOptionsDialog->getNotificationsPage()->getQuitApplicationCheckBox()->isChecked()) {
@@ -692,14 +472,16 @@ void MainWindow::openDroppedFile(QDropEvent *event)
   hideProgressBar();
 }
 
+/*!
+ * \brief MainWindow::openResultFiles
+ * Opens the result file(s).
+ * \param fileNames
+ */
 void MainWindow::openResultFiles(QStringList fileNames)
 {
-  QString currentDirectory = mpOMCProxy->changeDirectory();
-  foreach (QString fileName, fileNames)
-  {
+  foreach (QString fileName, fileNames) {
     QFileInfo fileInfo(fileName);
-    mpOMCProxy->changeDirectory(fileInfo.absoluteDir().absolutePath());
-    QStringList list = mpOMCProxy->readSimulationResultVars(fileInfo.fileName());
+    QStringList list = mpOMCProxy->readSimulationResultVars(fileInfo.absoluteFilePath());
     // close the simulation result file.
     mpOMCProxy->closeSimulationResultFile();
     if (list.size() > 0) {
@@ -708,7 +490,6 @@ void MainWindow::openResultFiles(QStringList fileNames)
       mpVariablesDockWidget->show();
     }
   }
-  mpOMCProxy->changeDirectory(currentDirectory);
 }
 
 void MainWindow::simulate(LibraryTreeItem *pLibraryTreeItem)
@@ -862,7 +643,7 @@ void MainWindow::exportModelFMU(LibraryTreeItem *pLibraryTreeItem)
   if (mpOMCProxy->translateModelFMU(pLibraryTreeItem->getNameStructure(), version, type, FMUName)) {
     mpMessagesWidget->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0, GUIMessages::getMessage(GUIMessages::FMU_GENERATED)
                                                 .arg(FMUName.isEmpty() ? pLibraryTreeItem->getNameStructure() : FMUName)
-                                                .arg(mpOMCProxy->changeDirectory()), Helper::scriptingKind,
+                                                .arg(mpOptionsDialog->getGeneralSettingsPage()->getWorkingDirectory()), Helper::scriptingKind,
                                                 Helper::notificationLevel));
   }
   // hide progress bar
@@ -886,7 +667,7 @@ void MainWindow::exportModelXML(LibraryTreeItem *pLibraryTreeItem)
   showProgressBar();
   if (mpOMCProxy->translateModelXML(pLibraryTreeItem->getNameStructure())) {
     mpMessagesWidget->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0, GUIMessages::getMessage(GUIMessages::XML_GENERATED)
-                                                .arg(mpOMCProxy->changeDirectory()).arg(pLibraryTreeItem->getNameStructure()),
+                                                .arg(mpOptionsDialog->getGeneralSettingsPage()->getWorkingDirectory()).arg(pLibraryTreeItem->getNameStructure()),
                                                 Helper::scriptingKind, Helper::notificationLevel));
   }
   // hide progress bar
@@ -2201,53 +1982,6 @@ void MainWindow::openRecentModelWidget()
   }
 }
 
-/*!
-  Slot activated when Re-simulateAction triggered signal is raised.\n
-  Re-simulates the model.
-  */
-void MainWindow::reSimulateModel()
-{
-  mpVariablesWidget->directReSimulate();
-}
-
-/*!
-  Slot activated when Re-simulateSetupAction triggered signal is raised.\n
-  Shows the simulation setup for re-simulation.
-  */
-void MainWindow::showReSimulateSetup()
-{
-  mpVariablesWidget->showReSimulateSetup();
-}
-
-void MainWindow::addNewPlotWindow()
-{
-  mpPlotWindowContainer->addPlotWindow();
-}
-
-void MainWindow::addNewParametricPlotWindow()
-{
-  mpPlotWindowContainer->addParametricPlotWindow();
-}
-
-void MainWindow::clearPlotWindow()
-{
-  mpPlotWindowContainer->clearPlotWindow();
-}
-
-//! shows the progress bar contained inside the status bar
-//! @see hideProgressBar()
-void MainWindow::showProgressBar()
-{
-  mpProgressBar->setVisible(true);
-}
-
-//! hides the progress bar contained inside the status bar
-//! @see hideProgressBar()
-void MainWindow::hideProgressBar()
-{
-  mpProgressBar->setVisible(false);
-}
-
 void MainWindow::updateModelSwitcherMenu(QMdiSubWindow *pActivatedWindow)
 {
   Q_UNUSED(pActivatedWindow);
@@ -2283,14 +2017,15 @@ void MainWindow::updateModelSwitcherMenu(QMdiSubWindow *pActivatedWindow)
   }
 }
 
+/*!
+ * \brief MainWindow::toggleAutoSave
+ * Start/Stop the auto save timer based on the settings.
+ */
 void MainWindow::toggleAutoSave()
 {
-  if (mpOptionsDialog->getGeneralSettingsPage()->getEnableAutoSaveGroupBox()->isChecked())
-  {
-    mpAutoSaveTimer->start(mpOptionsDialog->getGeneralSettingsPage()->getAutoSaveIntervalSpinBox()->value() * 1000);
-  }
-  else
-  {
+  if (mpOptionsDialog->getGeneralSettingsPage()->getEnableAutoSaveGroupBox()->isChecked()) {
+    mpAutoSaveTimer->start();
+  } else {
     mpAutoSaveTimer->stop();
   }
 }
@@ -2368,44 +2103,14 @@ void MainWindow::documentationDockWidgetVisibilityChanged(bool visible)
   }
 }
 
+/*!
+ * \brief MainWindow::autoSave
+ * Slot activated when mpAutoSaveTimer timeout SIGNAL is raised.\n
+ * Auto saves the classes which user has alreadys saved to a file. Classes not saved to a file are not saved.
+ */
 void MainWindow::autoSave()
 {
-//  bool autoSaveForSingleClasses = mpOptionsDialog->getGeneralSettingsPage()->getEnableAutoSaveForSingleClassesCheckBox()->isChecked();
-//  bool autoSaveForOneFilePackages = mpOptionsDialog->getGeneralSettingsPage()->getEnableAutoSaveForOneFilePackagesCheckBox()->isChecked();
-//  bool autoSaveForFolderPackages = false;
-//  // if auto save for any class type is enabled.
-//  if (autoSaveForSingleClasses || autoSaveForOneFilePackages || autoSaveForFolderPackages)
-//  {
-//    foreach (LibraryTreeNode* pLibraryTreeNode, mpLibraryTreeWidget->getLibraryTreeNodesList())
-//    {
-//      if (!pLibraryTreeNode->isSaved() && !pLibraryTreeNode->getFileName().isEmpty())
-//      {
-//        // if auto save for single file class is enabled.
-//        if (pLibraryTreeNode->getParentName().isEmpty() && pLibraryTreeNode->childCount() == 0 && autoSaveForSingleClasses)
-//        {
-//          mpLibraryTreeWidget->saveLibraryTreeNode(pLibraryTreeNode);
-//        }
-//        // if auto save for one file package is enabled.
-//        else if (pLibraryTreeNode->getParentName().isEmpty() && pLibraryTreeNode->childCount() > 0 && autoSaveForOneFilePackages)
-//        {
-//          mpLibraryTreeWidget->saveLibraryTreeNode(pLibraryTreeNode);
-//        }
-//        // if auto save for folder package is enabled.
-//        else if (autoSaveForFolderPackages)
-//        {
-//          LibraryTreeNode *pParentLibraryTreeNode = mpLibraryTreeWidget->getLibraryTreeNode(StringHandler::getFirstWordBeforeDot(pLibraryTreeNode->getNameStructure()));
-//          if (pParentLibraryTreeNode)
-//          {
-//            QFileInfo fileInfo(pParentLibraryTreeNode->getFileName());
-//            if ((pParentLibraryTreeNode->getSaveContentsType() == LibraryTreeNode::SaveFolderStructure) || (fileInfo.fileName().compare("package.mo") == 0))
-//            {
-//              mpLibraryTreeWidget->saveLibraryTreeNode(pParentLibraryTreeNode);
-//            }
-//          }
-//        }
-//      }
-//    }
-//  }
+  autoSaveHelper(mpLibraryWidget->getLibraryTreeModel()->getRootLibraryTreeItem());
 }
 
 /*!
@@ -2780,23 +2485,27 @@ void MainWindow::createActions()
   // resimulate action
   mpReSimulateModelAction = new QAction(QIcon(":/Resources/icons/re-simulate.svg"), Helper::reSimulate, this);
   mpReSimulateModelAction->setStatusTip(Helper::reSimulateTip);
-  connect(mpReSimulateModelAction, SIGNAL(triggered()), SLOT(reSimulateModel()));
+  connect(mpReSimulateModelAction, SIGNAL(triggered()), mpVariablesWidget, SLOT(directReSimulate()));
   // resimulate setup action
   mpReSimulateSetupAction = new QAction(QIcon(":/Resources/icons/re-simulation-center.svg"), Helper::reSimulateSetup, this);
   mpReSimulateSetupAction->setStatusTip(Helper::reSimulateSetupTip);
-  connect(mpReSimulateSetupAction, SIGNAL(triggered()), SLOT(showReSimulateSetup()));
+  connect(mpReSimulateSetupAction, SIGNAL(triggered()), mpVariablesWidget, SLOT(showReSimulateSetup()));
   // new plot window action
   mpNewPlotWindowAction = new QAction(QIcon(":/Resources/icons/plot-window.svg"), tr("New Plot Window"), this);
   mpNewPlotWindowAction->setStatusTip(tr("Inserts new plot window"));
-  connect(mpNewPlotWindowAction, SIGNAL(triggered()), SLOT(addNewPlotWindow()));
+  connect(mpNewPlotWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(addPlotWindow()));
   // new parametric plot action
   mpNewParametricPlotWindowAction = new QAction(QIcon(":/Resources/icons/parametric-plot-window.svg"), tr("New Parametric Plot Window"), this);
   mpNewParametricPlotWindowAction->setStatusTip(tr("Inserts new parametric plot window"));
-  connect(mpNewParametricPlotWindowAction, SIGNAL(triggered()), SLOT(addNewParametricPlotWindow()));
+  connect(mpNewParametricPlotWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(addParametricPlotWindow()));
+  // export variables action
+  mpExportVariablesAction = new QAction(QIcon(":/Resources/icons/export-variables.svg"), Helper::exportVariables, this);
+  mpExportVariablesAction->setStatusTip(tr("Exports the plotted variables to a CSV file"));
+  connect(mpExportVariablesAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(exportVariables()));
   // clear plot window action
   mpClearPlotWindowAction = new QAction(QIcon(":/Resources/icons/clear.svg"), tr("Clear Plot Window"), this);
   mpClearPlotWindowAction->setStatusTip(tr("Clears all the curves from the plot window"));
-  connect(mpClearPlotWindowAction, SIGNAL(triggered()), SLOT(clearPlotWindow()));
+  connect(mpClearPlotWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(clearPlotWindow()));
   // Other Actions
   // export as image action
   mpExportAsImageAction = new QAction(QIcon(":/Resources/icons/bitmap-shape.svg"), Helper::exportAsImage, this);
@@ -2997,13 +2706,31 @@ void MainWindow::createMenus()
 }
 
 /*!
-  Stores the window states and geometry of all Plot Windows.
-  */
-/*
-  The application window title and window icon gets corrupted when we switch between modeling & plotting perspective.
-  To solve this we tile the plot windows when we switch to modeling and welcome perspective. But before calling tileSubWindows() we save all
-  the plot windows states & geometry and then restore it when switching back to plotting view.
-  */
+ * \brief MainWindow::autoSaveHelper
+ * Helper function for MainWindow::autoSave()
+ * \param pLibraryTreeItem
+ */
+void MainWindow::autoSaveHelper(LibraryTreeItem *pLibraryTreeItem)
+{
+  for (int i = 0; i < pLibraryTreeItem->getChildren().size(); i++) {
+    LibraryTreeItem *pChildLibraryTreeItem = pLibraryTreeItem->child(i);
+    if (!pChildLibraryTreeItem->isSystemLibrary()) {
+      if (pChildLibraryTreeItem->isFilePathValid() && !pChildLibraryTreeItem->isSaved()) {
+        mpLibraryWidget->saveLibraryTreeItem(pChildLibraryTreeItem);
+      } else {
+        autoSaveHelper(pChildLibraryTreeItem);
+      }
+    }
+  }
+}
+
+/*!
+ * \brief MainWindow::storePlotWindowsStateAndGeometry
+ * Stores the window states and geometry of all Plot Windows.\n
+ * The application window title and window icon gets corrupted when we switch between modeling & plotting perspective.
+ * To solve this we tile the plot windows when we switch to modeling and welcome perspective. But before calling tileSubWindows() we save all
+ * the plot windows states & geometry and then restore it when switching back to plotting view.
+ */
 void MainWindow::storePlotWindowsStateAndGeometry()
 {
   if (mPlotWindowsStatesList.isEmpty() && mPlotWindowsGeometriesList.isEmpty()) {
@@ -3262,6 +2989,9 @@ void MainWindow::createToolbars()
   mpPlotToolBar->addSeparator();
   mpPlotToolBar->addAction(mpNewPlotWindowAction);
   mpPlotToolBar->addAction(mpNewParametricPlotWindowAction);
+  mpPlotToolBar->addSeparator();
+  mpPlotToolBar->addAction(mpExportVariablesAction);
+  mpPlotToolBar->addSeparator();
   mpPlotToolBar->addAction(mpClearPlotWindowAction);
   // TLM Simulation Toolbar
   mpTLMSimulationToolbar = addToolBar(tr("TLM Simulation Toolbar"));
