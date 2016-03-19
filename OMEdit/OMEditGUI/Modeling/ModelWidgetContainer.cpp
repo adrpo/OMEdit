@@ -508,8 +508,8 @@ void GraphicsView::addConnectionToClass(LineAnnotation *pConnectionLineAnnotatio
   if (mpModelWidget->getLibraryTreeItem()->getLibraryType()== LibraryTreeItem::MetaModel) {
     // show TLM connection attributes dialog
     MainWindow *pMainWindow = mpModelWidget->getModelWidgetContainer()->getMainWindow();
-    TLMConnectionAttributes *pTLMConnectionAttributes = new TLMConnectionAttributes(pConnectionLineAnnotation, pMainWindow);
-    pTLMConnectionAttributes->show();
+    MetaModelConnectionAttributes *pMetaModelConnectionAttributes = new MetaModelConnectionAttributes(pConnectionLineAnnotation, pMainWindow);
+    pMetaModelConnectionAttributes->show();
   } else {
     MainWindow *pMainWindow = mpModelWidget->getModelWidgetContainer()->getMainWindow();
     if (pMainWindow->getOMCProxy()->addConnection(pConnectionLineAnnotation->getStartComponentName(),
@@ -3773,12 +3773,12 @@ void ModelWidget::showDocumentationView()
 }
 
 /*!
- * \brief ModelWidget::MetaModelEditorTextChanged
+ * \brief ModelWidget::metaModelEditorTextChanged
  * Called when MetaModelEditor text has been changed by user manually.\n
  * Updates the LibraryTreeItem and ModelWidget with new changes.
  * \return
  */
-bool ModelWidget::MetaModelEditorTextChanged()
+bool ModelWidget::metaModelEditorTextChanged()
 {
   MessageHandler *pMessageHandler = new MessageHandler;
   Utilities::parseMetaModelText(pMessageHandler, mpEditor->getPlainTextEdit()->toPlainText());
@@ -3793,6 +3793,9 @@ bool ModelWidget::MetaModelEditorTextChanged()
   delete pMessageHandler;
   /* get the model components and connectors */
   reDrawModelWidget();
+  // update the xml document with new accepted text.
+  MetaModelEditor *pMetaModelEditor = dynamic_cast<MetaModelEditor*>(mpEditor);
+  pMetaModelEditor->setXmlDocument(mpEditor->getPlainTextEdit()->toPlainText());
   return true;
 }
 

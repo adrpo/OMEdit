@@ -64,6 +64,7 @@ public:
   MetaModelEditor(ModelWidget *pModelWidget);
   QString getLastValidText() {return mLastValidText;}
   bool validateText();
+  void setXmlDocument(QString content) {mXmlDocument.setContent(content);}
   QDomElement getSubModelsElement();
   QDomNodeList getSubModels();
   QDomElement getConnectionsElement();
@@ -75,7 +76,6 @@ public:
   void updateSubModelParameters(QString name, QString startCommand, QString exactStepFlag);
   bool createConnection(QString From, QString To, QString delay, QString alpha, QString zf, QString zfr, QString points);
   void updateConnection(QString fromSubModel, QString toSubModel, QString points);
-  bool addSimulationParams(QString startTime, QString stopTime);
   void updateSimulationParams(QString startTime, QString stopTime);
   bool isSimulationParams();
   QString getSimulationStartTime();

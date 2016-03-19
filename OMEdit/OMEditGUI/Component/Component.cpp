@@ -396,7 +396,9 @@ Component::Component(LibraryTreeItem *pLibraryTreeItem, Component *pParentCompon
   : QGraphicsItem(pParentComponent), mpReferenceComponent(0), mpParentComponent(pParentComponent)
 {
   mpLibraryTreeItem = pLibraryTreeItem;
-  mpComponentInfo = mpParentComponent->getComponentInfo();
+  mpComponentInfo = new ComponentInfo;
+  mpComponentInfo->setName(mpParentComponent->getComponentInfo()->getName());
+  mpComponentInfo->setClassName(mpLibraryTreeItem->getNameStructure());
   mpGraphicsView = mpParentComponent->getGraphicsView();
   mIsInheritedComponent = mpParentComponent->isInheritedComponent();
   mComponentType = Component::Extend;
@@ -2107,12 +2109,12 @@ void Component::viewDocumentation()
 
 /*!
  * \brief Component::showSubModelAttributes
- * Slot that opens up the SubModelAttributes Dialog.
+ * Slot that opens up the MetaModelSubModelAttributes Dialog.
  */
 void Component::showSubModelAttributes()
 {
   MainWindow *pMainWindow = mpGraphicsView->getModelWidget()->getModelWidgetContainer()->getMainWindow();
-  SubModelAttributes *pSubModelAttributes = new SubModelAttributes(this, pMainWindow);
+  MetaModelSubModelAttributes *pSubModelAttributes = new MetaModelSubModelAttributes(this, pMainWindow);
   pSubModelAttributes->exec();
 }
 
