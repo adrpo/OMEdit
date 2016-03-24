@@ -710,6 +710,8 @@ public:
   void setFMIExportType(QString type);
   QString getFMIExportType();
   QLineEdit* getFMUNameTextBox() {return mpFMUNameTextBox;}
+  QGroupBox* getPlatformsGroupBox() {return mpPlatformsGroupBox;}
+  QComboBox* getLinkingComboBox() {return mpLinkingComboBox;}
 private:
   OptionsDialog *mpOptionsDialog;
   QGroupBox *mpExportGroupBox;
@@ -722,6 +724,8 @@ private:
   QRadioButton *mpModelExchangeCoSimulationRadioButton;
   Label *mpFMUNameLabel;
   QLineEdit *mpFMUNameTextBox;
+  QGroupBox *mpPlatformsGroupBox;
+  QComboBox *mpLinkingComboBox;
 };
 
 class TLMPage : public QWidget

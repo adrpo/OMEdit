@@ -147,9 +147,10 @@ OMCProxy::OMCProxy(MainWindow *pMainWindow)
     pOMCDiffWidgetLayout->addWidget(mpOMCDiffMergedTextBox, 3, 0, 1, 2);
     mpOMCDiffWidget->setLayout(pOMCDiffWidgetLayout);
   }
+  mUnitConversionList.clear();
+  mDerivedUnitsMap.clear();
   //start the server
-  if(!initializeOMC())      // if we are unable to start OMC. Exit the application.
-  {
+  if(!initializeOMC()) {  // if we are unable to start OMC. Exit the application.
     mpMainWindow->setExitApplicationStatus(true);
     return;
   }
@@ -500,10 +501,12 @@ void OMCProxy::exitApplication()
 }
 
 /*!
-  Returns the OMC error string.\n
-  \return the error string.
-  \deprecated Use printMessagesStringInternal(). Now used where we want to consume the error message without showing it to user.
-  */
+ * \brief OMCProxy::getErrorString
+ * Returns the OMC error string.\n
+ * \param warningsAsErrors
+ * \return the error string.
+ * \deprecated Use printMessagesStringInternal(). Now used where we want to consume the error message without showing it to user.
+ */
 QString OMCProxy::getErrorString(bool warningsAsErrors)
 {
   return mpOMCInterface->getErrorString(warningsAsErrors);
@@ -809,14 +812,18 @@ bool OMCProxy::isPackage(QString className)
 }
 
 /*!
-  Returns true if the given type is one of the predefined types in Modelica.
-  */
+ * \brief OMCProxy::isBuiltinType
+ * Returns true if the given type is one of the predefined types in Modelica.
+ * \param typeName
+ * \return
+ */
 bool OMCProxy::isBuiltinType(QString typeName)
 {
   return (typeName == "Real" ||
           typeName == "Integer" ||
           typeName == "String" ||
-          typeName == "Boolean");
+          typeName == "Boolean" ||
+          typeName == "ExternalObject");
 }
 
 /*!
@@ -992,7 +999,7 @@ QStringList OMCProxy::getComponentModifierNames(QString className, QString name)
 QString OMCProxy::getComponentModifierValue(QString className, QString name)
 {
   sendCommand("getComponentModifierValue(" + className + "," + name + ")");
-  return StringHandler::getModifierValue(getResult()).trimmed();
+  return getResult().trimmed();
 }
 
 /*!
@@ -1051,7 +1058,7 @@ QStringList OMCProxy::getExtendsModifierNames(QString className, QString extends
 QString OMCProxy::getExtendsModifierValue(QString className, QString extendsClassName, QString modifierName)
 {
   sendCommand("getExtendsModifierValue(" + className + "," + extendsClassName + "," + modifierName + ")");
-  return StringHandler::getModifierValue(getResult()).trimmed();
+  return getResult().trimmed();
 }
 
 bool OMCProxy::setExtendsModifierValue(QString className, QString extendsClassName, QString modifierName, QString modifierValue)
@@ -2052,19 +2059,20 @@ OMCInterface::getSimulationOptions_res OMCProxy::getSimulationOptions(QString cl
 }
 
 /*!
- * \brief OMCProxy::translateModelFMU
+ * \brief OMCProxy::buildModelFMU
  * Creates the FMU of the model.
  * \param className - the name of the class.
  * \param version - the fmu version
  * \param type - the fmu type
  * \param fileNamePrefix
+ * \param platforms
  * \return
  */
-bool OMCProxy::translateModelFMU(QString className, double version, QString type, QString fileNamePrefix)
+bool OMCProxy::buildModelFMU(QString className, double version, QString type, QString fileNamePrefix, QList<QString> platforms)
 {
   bool result = false;
   fileNamePrefix = fileNamePrefix.isEmpty() ? "<default>" : fileNamePrefix;
-  QString res = mpOMCInterface->translateModelFMU(className, QString::number(version), type, fileNamePrefix);
+  QString res = mpOMCInterface->buildModelFMU(className, QString::number(version), type, fileNamePrefix, platforms);
   if (res.compare("SimCode: The model " + className + " has been translated to FMU") == 0) {
     result = true;
     mpMainWindow->getLibraryWidget()->getLibraryTreeModel()->loadDependentLibraries(getClassNames());
@@ -2307,8 +2315,7 @@ QStringList OMCProxy::getAvailableLibraries()
  */
 QString OMCProxy::getDerivedClassModifierValue(QString className, QString modifierName)
 {
-  QString result = mpOMCInterface->getDerivedClassModifierValue(className, modifierName);
-  return StringHandler::getModifierValue(result);
+  return mpOMCInterface->getDerivedClassModifierValue(className, modifierName);
 }
 
 /*!
@@ -2321,7 +2328,38 @@ QString OMCProxy::getDerivedClassModifierValue(QString className, QString modifi
  */
 OMCInterface::convertUnits_res OMCProxy::convertUnits(QString from, QString to)
 {
-  return mpOMCInterface->convertUnits(from, to);
+  foreach (UnitConverion unitConversion, mUnitConversionList) {
+    if ((unitConversion.mFromUnit.compare(from) == 0) && (unitConversion.mToUnit.compare(to) == 0)) {
+      return unitConversion.mConvertUnits;
+    }
+  }
+  OMCInterface::convertUnits_res convertUnits_res = mpOMCInterface->convertUnits(from, to);
+  UnitConverion unitConverion;
+  unitConverion.mFromUnit = from;
+  unitConverion.mToUnit = to;
+  unitConverion.mConvertUnits = convertUnits_res;
+  mUnitConversionList.append(unitConverion);
+  return convertUnits_res;
+}
+
+/*!
+ * \brief OMCProxy::getDerivedUnits
+ * Returns the list of derived units for the specified base unit.
+ * \param baseUnit
+ * \return
+ */
+QList<QString> OMCProxy::getDerivedUnits(QString baseUnit)
+{
+  QMap<QString, QList<QString> >::iterator derivedUnitsIterator;
+  for (derivedUnitsIterator = mDerivedUnitsMap.begin(); derivedUnitsIterator != mDerivedUnitsMap.end(); ++derivedUnitsIterator) {
+    if (derivedUnitsIterator.key().compare(baseUnit) == 0) {
+      return derivedUnitsIterator.value();
+    }
+  }
+  QList<QString> result = mpOMCInterface->getDerivedUnits(baseUnit);
+  getErrorString();
+  mDerivedUnitsMap.insert(baseUnit, result);
+  return result;
 }
 
 /*!

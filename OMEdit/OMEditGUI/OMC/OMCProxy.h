@@ -51,16 +51,17 @@ class StringHandler;
 class OMCInterface;
 class LibraryTreeItem;
 
-struct cachedOMCCommand
-{
-  QString mOMCCommand;
-  QString mOMCCommandResult;
-};
+typedef struct {
+  QString mFromUnit;
+  QString mToUnit;
+  OMCInterface::convertUnits_res mConvertUnits;
+} UnitConverion;
 
 class OMCProxy : public QObject
 {
   Q_OBJECT
 private:
+  MainWindow *mpMainWindow;
   bool mHasInitialized;
   QString mResult;
   QWidget *mpOMCLoggerWidget;
@@ -82,8 +83,8 @@ private:
   QTextStream mCommunicationLogFileTextStream;
   QFile mCommandsMosFile;
   QTextStream mCommandsLogFileTextStream;
-  MainWindow *mpMainWindow;
-  int mAnnotationVersion;
+  QList<UnitConverion> mUnitConversionList;
+  QMap<QString, QList<QString> > mDerivedUnitsMap;
   OMCInterface *mpOMCInterface;
 public:
   OMCProxy(MainWindow *pMainWindow);
@@ -195,7 +196,7 @@ public:
   QString checkAllModelsRecursive(QString className);
   bool isExperiment(QString className);
   OMCInterface::getSimulationOptions_res getSimulationOptions(QString className, double defaultTolerance = 1e-4);
-  bool translateModelFMU(QString className, double version, QString type, QString fileNamePrefix);
+  bool buildModelFMU(QString className, double version, QString type, QString fileNamePrefix, QList<QString> platforms);
   bool translateModelXML(QString className);
   QString importFMU(QString fmuName, QString outputDirectory, int logLevel, bool debugLogging, bool generateInputConnectors, bool generateOutputConnectors);
   QString getMatchingAlgorithm();
@@ -212,6 +213,7 @@ public:
   QStringList getAvailableLibraries();
   QString getDerivedClassModifierValue(QString className, QString modifierName);
   OMCInterface::convertUnits_res convertUnits(QString from, QString to);
+  QList<QString> getDerivedUnits(QString baseUnit);
   bool getDocumentationClassAnnotation(QString className);
   int numProcessors();
   QString help(QString topic);

@@ -45,6 +45,8 @@
 #include "TLMCoSimulationOutputWidget.h"
 #ifdef WIN32
 #include "version.h"
+#else
+#include "omc_config.h"
 #endif
 
 MainWindow::MainWindow(QSplashScreen *pSplashScreen, bool debug, QWidget *parent)
@@ -640,7 +642,9 @@ void MainWindow::exportModelFMU(LibraryTreeItem *pLibraryTreeItem)
   double version = mpOptionsDialog->getFMIPage()->getFMIExportVersion();
   QString type = mpOptionsDialog->getFMIPage()->getFMIExportType();
   QString FMUName = mpOptionsDialog->getFMIPage()->getFMUNameTextBox()->text();
-  if (mpOMCProxy->translateModelFMU(pLibraryTreeItem->getNameStructure(), version, type, FMUName)) {
+  QSettings *pSettings = OpenModelica::getApplicationSettings();
+  QList<QString> platforms = pSettings->value("FMIExport/Platforms").toStringList();
+  if (mpOMCProxy->buildModelFMU(pLibraryTreeItem->getNameStructure(), version, type, FMUName, platforms)) {
     mpMessagesWidget->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0, GUIMessages::getMessage(GUIMessages::FMU_GENERATED)
                                                 .arg(FMUName.isEmpty() ? pLibraryTreeItem->getNameStructure() : FMUName)
                                                 .arg(mpOptionsDialog->getGeneralSettingsPage()->getWorkingDirectory()), Helper::scriptingKind,
@@ -3108,11 +3112,7 @@ AboutOMEditWidget::AboutOMEditWidget(MainWindow *pMainWindow)
   // OMEdit intro text
   Label *pIntroLabel = new Label(Helper::applicationIntroText);
   pIntroLabel->setFont(QFont(Helper::systemFontInfo.family(), Helper::systemFontInfo.pointSize() + 3 + MAC_FONT_FACTOR));
-#ifdef WIN32
   Label *pOMEditVersionLabel = new Label(GIT_SHA);
-#else
-  Label *pOMEditVersionLabel = new Label;
-#endif
   pOMEditVersionLabel->setFont(QFont(Helper::systemFontInfo.family(), Helper::systemFontInfo.pointSize() - 3 + MAC_FONT_FACTOR));
   // OpenModelica compiler info
   Label *pConnectedLabel = new Label(QString("Connected to ").append(Helper::OpenModelicaVersion));
@@ -3153,12 +3153,23 @@ AboutOMEditWidget::AboutOMEditWidget(MainWindow *pMainWindow)
   pContributorsLabel->setOpenExternalLinks(true);
   pContributorsLabel->setFont(QFont(Helper::systemFontInfo.family(), Helper::systemFontInfo.pointSize() - 4 + MAC_FONT_FACTOR));
   pContributorsLabel->setText(contributorsText);
+  // widget for all labels
+  QWidget *pWidget = new QWidget;
+  QGridLayout *pWidgetLayout = new QGridLayout;
+  pWidgetLayout->setContentsMargins(0, 0, 0, 0);
+  pWidgetLayout->addWidget(pIntroLabel, 0, 0, 1, 1, Qt::AlignHCenter);
+  pWidgetLayout->addWidget(pOMEditVersionLabel, 1, 0, 1, 1, Qt::AlignHCenter);
+  pWidgetLayout->addWidget(pConnectedLabel, 2, 0, 1, 1, Qt::AlignHCenter);
+  pWidgetLayout->addLayout(pAboutLayout, 3, 0);
+  pWidgetLayout->addWidget(pContributorsHeading, 4, 0);
+  pWidgetLayout->addWidget(pContributorsLabel, 5, 0);
+  pWidget->setLayout(pWidgetLayout);
   // QScrollArea
   QScrollArea *pScrollArea = new QScrollArea;
   pScrollArea->setFrameShape(QFrame::NoFrame);
   pScrollArea->setBackgroundRole(QPalette::Base);
   pScrollArea->setWidgetResizable(true);
-  pScrollArea->setWidget(pContributorsLabel);
+  pScrollArea->setWidget(pWidget);
   // close button
   QPushButton *pCloseButton = new QPushButton(Helper::close);
   connect(pCloseButton, SIGNAL(clicked()), SLOT(hide()));
@@ -3166,13 +3177,8 @@ AboutOMEditWidget::AboutOMEditWidget(MainWindow *pMainWindow)
   QGridLayout *pMainLayout = new QGridLayout;
   pMainLayout->setContentsMargins(45, 200, 45, 20);
   pMainLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-  pMainLayout->addWidget(pIntroLabel, 1, 0, 1, 1, Qt::AlignHCenter);
-  pMainLayout->addWidget(pOMEditVersionLabel, 2, 0, 1, 1, Qt::AlignHCenter);
-  pMainLayout->addWidget(pConnectedLabel, 3, 0, 1, 1, Qt::AlignHCenter);
-  pMainLayout->addLayout(pAboutLayout, 4, 0, 1, 1);
-  pMainLayout->addWidget(pContributorsHeading, 5, 0, 1, 1);
-  pMainLayout->addWidget(pScrollArea, 6, 0, 1, 1);
-  pMainLayout->addWidget(pCloseButton, 7, 0, 1, 1, Qt::AlignRight);
+  pMainLayout->addWidget(pScrollArea, 0, 0);
+  pMainLayout->addWidget(pCloseButton, 1, 0, 1, 1, Qt::AlignRight);
   setLayout(pMainLayout);
 }
 

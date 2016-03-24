@@ -516,8 +516,9 @@ void OptionsDialog::readDebuggerSettings()
 }
 
 /*!
-  Reads the FMI section settings from omedit.ini
-  */
+ * \brief OptionsDialog::readFMISettings
+ * Reads the FMI section settings from omedit.ini
+ */
 void OptionsDialog::readFMISettings()
 {
   if (mpSettings->contains("FMIExport/Version")) {
@@ -526,8 +527,28 @@ void OptionsDialog::readFMISettings()
   if (mpSettings->contains("FMIExport/Type")) {
     mpFMIPage->setFMIExportType(mpSettings->value("FMIExport/Type").toString());
   }
-  if (mpSettings->contains("FMI/FMUName")) {
+  if (mpSettings->contains("FMIExport/FMUName")) {
     mpFMIPage->getFMUNameTextBox()->setText(mpSettings->value("FMI/FMUName").toString());
+  }
+  // read platforms
+  QStringList platforms = mpSettings->value("FMIExport/Platforms").toStringList();
+  foreach (QString platform, platforms) {
+    int currentIndex = mpFMIPage->getLinkingComboBox()->findData(platform);
+    if (currentIndex > -1) {
+      mpFMIPage->getLinkingComboBox()->setCurrentIndex(currentIndex);
+    } else {
+      int i = 0;
+      while (QLayoutItem* pLayoutItem = mpFMIPage->getPlatformsGroupBox()->layout()->itemAt(i)) {
+        if (dynamic_cast<QCheckBox*>(pLayoutItem->widget())) {
+          QCheckBox *pPlatformCheckBox = dynamic_cast<QCheckBox*>(pLayoutItem->widget());
+          if (pPlatformCheckBox->text().compare(platform) == 0) {
+            pPlatformCheckBox->setChecked(true);
+            break;
+          }
+        }
+        i++;
+      }
+    }
   }
 }
 
@@ -865,13 +886,31 @@ void OptionsDialog::saveDebuggerSettings()
 }
 
 /*!
-  Saves the FMI section settings to omedit.ini
-  */
+ * \brief OptionsDialog::saveFMISettings
+ * Saves the FMI section settings to omedit.ini
+ */
 void OptionsDialog::saveFMISettings()
 {
   mpSettings->setValue("FMIExport/Version", mpFMIPage->getFMIExportVersion());
   mpSettings->setValue("FMIExport/Type", mpFMIPage->getFMIExportType());
-  mpSettings->setValue("FMI/FMUName", mpFMIPage->getFMUNameTextBox()->text());
+  mpSettings->setValue("FMIExport/FMUName", mpFMIPage->getFMUNameTextBox()->text());
+  // save platforms
+  QStringList platforms;
+  QString linking = mpFMIPage->getLinkingComboBox()->itemData(mpFMIPage->getLinkingComboBox()->currentIndex()).toString();
+  if (linking.compare("none") != 0) {
+    platforms.append(linking);
+  }
+  int i = 0;
+  while (QLayoutItem* pLayoutItem = mpFMIPage->getPlatformsGroupBox()->layout()->itemAt(i)) {
+    if (dynamic_cast<QCheckBox*>(pLayoutItem->widget())) {
+      QCheckBox *pPlatformCheckBox = dynamic_cast<QCheckBox*>(pLayoutItem->widget());
+      if (pPlatformCheckBox->isChecked()) {
+        platforms.append(pPlatformCheckBox->text());
+      }
+    }
+    i++;
+  }
+  mpSettings->setValue("FMIExport/Platforms", platforms);
 }
 
 /*!
@@ -3481,6 +3520,35 @@ FMIPage::FMIPage(OptionsDialog *pOptionsDialog)
   mpFMUNameLabel = new Label(tr("FMU Name:"));
   mpFMUNameTextBox = new QLineEdit;
   mpFMUNameTextBox->setPlaceholderText("<default>");
+#ifdef WIN32
+  QStringList paths = QString(getenv("PATH")).split(";");
+#else
+  QStringList paths = QString(getenv("PATH")).split(":");
+#endif
+  QStringList nameFilters;
+  nameFilters << "*-*-*-*cc";
+  QStringList compilers;
+  foreach (QString path, paths) {
+    QDir dir(path);
+    compilers << dir.entryList(nameFilters, QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+  }
+  mpPlatformsGroupBox = new QGroupBox(tr("Platforms"));
+  Label *pPlatformNoteLabel = new Label(tr("Note: The list of platforms is created by searching for programs in the PATH\n"
+                                           "matching pattern \"*-*-*-*cc\"."));
+  mpLinkingComboBox = new QComboBox;
+  mpLinkingComboBox->addItem(tr("None"), "none");
+  mpLinkingComboBox->addItem(tr("Dynamic"), "dynamic");
+  mpLinkingComboBox->addItem(tr("Static"), "static");
+  mpLinkingComboBox->setCurrentIndex(2);
+  // set the type groupbox layout
+  QVBoxLayout *pPlatformsLayout = new QVBoxLayout;
+  pPlatformsLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+  pPlatformsLayout->addWidget(pPlatformNoteLabel);
+  pPlatformsLayout->addWidget(mpLinkingComboBox);
+  foreach (QString compiler, compilers) {
+    pPlatformsLayout->addWidget(new QCheckBox(compiler.left(compiler.lastIndexOf('-'))));
+  }
+  mpPlatformsGroupBox->setLayout(pPlatformsLayout);
   // set the export group box layout
   QGridLayout *pExportLayout = new QGridLayout;
   pExportLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
@@ -3488,6 +3556,7 @@ FMIPage::FMIPage(OptionsDialog *pOptionsDialog)
   pExportLayout->addWidget(mpTypeGroupBox, 1, 0, 1, 2);
   pExportLayout->addWidget(mpFMUNameLabel, 2, 0);
   pExportLayout->addWidget(mpFMUNameTextBox, 2, 1);
+  pExportLayout->addWidget(mpPlatformsGroupBox, 3, 0, 1, 2);
   mpExportGroupBox->setLayout(pExportLayout);
   // set the layout
   QVBoxLayout *pMainLayout = new QVBoxLayout;
