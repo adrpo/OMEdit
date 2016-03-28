@@ -117,13 +117,10 @@ void SimulationDialog::directSimulate(LibraryTreeItem *pLibraryTreeItem, bool la
 void SimulationDialog::setUpForm()
 {
   // simulation widget heading
-  mpSimulationHeading = new Label;
+  mpSimulationHeading = Utilities::getHeadingLabel("");
   mpSimulationHeading->setElideMode(Qt::ElideMiddle);
-  mpSimulationHeading->setFont(QFont(Helper::systemFontInfo.family(), Helper::headingFontSize));
   // Horizontal separator
-  mpHorizontalLine = new QFrame();
-  mpHorizontalLine->setFrameShape(QFrame::HLine);
-  mpHorizontalLine->setFrameShadow(QFrame::Sunken);
+  mpHorizontalLine = Utilities::getHeadingLine();
   // simulation tab widget
   mpSimulationTabWidget = new QTabWidget;
   // General Tab
@@ -438,8 +435,16 @@ void SimulationDialog::setUpForm()
   mpLoggingGroupBox->setLayout(mpLoggingGroupLayout);
   // additional simulation flags
   mpAdditionalSimulationFlagsLabel = new Label(tr("Additional Simulation Flags (Optional):"));
-  mpAdditionalSimulationFlagsLabel->setToolTip(tr("Space separated list of simulation flags"));
+  mpAdditionalSimulationFlagsLabel->setToolTip(tr("Space separated list of simulation flags e.g., -abortSlowSimulation -alarm=0"));
   mpAdditionalSimulationFlagsTextBox = new QLineEdit;
+  mpSimulationFlagsHelpButton = new QToolButton;
+  mpSimulationFlagsHelpButton->setIcon(QIcon(":/Resources/icons/link-external.svg"));
+  mpSimulationFlagsHelpButton->setToolTip(tr("Simulation flags help"));
+  connect(mpSimulationFlagsHelpButton, SIGNAL(clicked()), SLOT(showSimulationFlagsHelp()));
+  // additional simulation flags layout
+  QHBoxLayout *pAdditionalSimulationFlagsTabLayout = new QHBoxLayout;
+  pAdditionalSimulationFlagsTabLayout->addWidget(mpAdditionalSimulationFlagsTextBox);
+  pAdditionalSimulationFlagsTabLayout->addWidget(mpSimulationFlagsHelpButton);
   // set SimulationFlags Tab Layout
   QGridLayout *pSimulationFlagsTabLayout = new QGridLayout;
   pSimulationFlagsTabLayout->setAlignment(Qt::AlignTop);
@@ -469,7 +474,7 @@ void SimulationDialog::setUpForm()
   pSimulationFlagsTabLayout->addWidget(mpEnableAllWarningsCheckBox, 11, 0);
   pSimulationFlagsTabLayout->addWidget(mpLoggingGroupBox, 12, 0, 1, 3);
   pSimulationFlagsTabLayout->addWidget(mpAdditionalSimulationFlagsLabel, 13, 0);
-  pSimulationFlagsTabLayout->addWidget(mpAdditionalSimulationFlagsTextBox, 13, 1, 1, 2);
+  pSimulationFlagsTabLayout->addLayout(pAdditionalSimulationFlagsTabLayout, 13, 1, 1, 2);
   mpSimulationFlagsTab->setLayout(pSimulationFlagsTabLayout);
   // add Output Tab to Simulation TabWidget
   mpSimulationTabWidget->addTab(mpSimulationFlagsTabScrollArea, tr("Simulation Flags"));
@@ -1085,7 +1090,7 @@ void SimulationDialog::enableDasslOptions(QString method)
 /*!
  * \brief SimulationDialog::showIntegrationHelp
  * Slot activated when mpMehtodHelpButton clicked signal is raised.\n
- * Opens the IntegrationAlgorithms.pdf file.
+ * Opens the simulationflags.html page of OpenModelica users guide.
  */
 void SimulationDialog::showIntegrationHelp()
 {
@@ -1128,6 +1133,22 @@ void SimulationDialog::browseModelSetupFile()
 void SimulationDialog::browseEquationSystemInitializationFile()
 {
   mpEquationSystemInitializationFileTextBox->setText(StringHandler::getOpenFileName(this, QString(Helper::applicationName).append(" - ").append(Helper::chooseFile), NULL, Helper::matFileTypes, NULL));
+}
+
+/*!
+ * \brief SimulationDialog::showSimulationFlagsHelp
+ * Slot activated when mpSimulationFlagsHelpButton clicked signal is raised.\n
+ * Opens the simulationflags.html page of OpenModelica users guide.
+ */
+void SimulationDialog::showSimulationFlagsHelp()
+{
+  QUrl integrationAlgorithmsPath (QString("file:///").append(QString(Helper::OpenModelicaHome).replace("\\", "/"))
+                                  .append("/share/doc/omc/OpenModelicaUsersGuide/simulationflags.html"));
+  if (!QDesktopServices::openUrl(integrationAlgorithmsPath)) {
+    QString errorMessage = GUIMessages::getMessage(GUIMessages::UNABLE_TO_OPEN_FILE).arg(integrationAlgorithmsPath.toString());
+    mpMainWindow->getMessagesWidget()->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0, errorMessage,
+                                                                 Helper::scriptingKind, Helper::errorLevel));
+  }
 }
 
 /*!

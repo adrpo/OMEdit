@@ -115,9 +115,9 @@ signals:
 };
 
 /*!
-  \class Label
-  \brief Creates a QLabel with elidable text. The default elide mode is Qt::ElideMiddle.Allows text selection via mouse.
-  */
+ * \class Label
+ * \brief Creates a QLabel with elidable text. The default elide mode is Qt::ElideNone. Allows text selection via mouse.
+ */
 class Label : public QLabel
 {
 public:
@@ -306,6 +306,8 @@ private:
 namespace Utilities {
   void parseMetaModelText(MessageHandler *pMessageHandler, QString contents);
   qreal convertUnit(qreal value, qreal offset, qreal scaleFactor);
+  Label* getHeadingLabel(QString heading);
+  QFrame* getHeadingLine();
 }
 
 #endif // UTILITIES_H
