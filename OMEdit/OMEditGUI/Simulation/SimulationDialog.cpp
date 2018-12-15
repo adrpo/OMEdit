@@ -1724,13 +1724,25 @@ void SimulationDialog::simulationProcessFinished(SimulationOptions simulationOpt
   QString workingDirectory = simulationOptions.getWorkingDirectory();
   // read the result file
   QFileInfo resultFileInfo(QString(workingDirectory).append("/").append(simulationOptions.getFullResultFileName()));
+  resultFileInfo.setCaching(false);
   QRegExp regExp("\\b(mat|plt|csv)\\b");
   /* ticket:4935 Check the simulation result size via readSimulationResultSize
    * If the result size is zero then don't switch to the plotting view.
    */
-  if (regExp.indexIn(simulationOptions.getFullResultFileName()) != -1 &&
-      resultFileInfo.exists() && resultFileLastModifiedDateTime <= resultFileInfo.lastModified() &&
-      MainWindow::instance()->getOMCProxy()->readSimulationResultSize(resultFileInfo.absoluteFilePath()) > 0) {
+  QDateTime resultFileModificationTime = resultFileInfo.lastModified();
+  // adrpo: TODO! FIXME!
+  // maybe we can use these flags to give some info below on why we don't switch to plot perspective (a notification or something)
+  bool resultFileKnown = regExp.indexIn(simulationOptions.getFullResultFileName()) != -1;
+  bool resultFileExists = resultFileInfo.exists();
+  // use secsTo as lastModified returns to second not to mili/nanoseconds, see #5251
+  bool resultFileNewer = resultFileLastModifiedDateTime.secsTo(resultFileModificationTime) >= 0;
+  bool resultFileNonZeroSize = MainWindow::instance()->getOMCProxy()->readSimulationResultSize(resultFileInfo.absoluteFilePath()) > 0;
+
+  // const char *timeBefore = resultFileLastModifiedDateTime.toString("hh:mm:ss:zzz").toStdString().c_str();
+  // const char *timeAfter = resultFileModificationTime.toString("hh:mm:ss:zzz").toStdString().c_str();
+
+  if (resultFileKnown && resultFileExists &&  resultFileNewer && resultFileNonZeroSize)
+  {
     VariablesWidget *pVariablesWidget = MainWindow::instance()->getVariablesWidget();
     OMCProxy *pOMCProxy = MainWindow::instance()->getOMCProxy();
     QStringList list = pOMCProxy->readSimulationResultVars(resultFileInfo.absoluteFilePath());
